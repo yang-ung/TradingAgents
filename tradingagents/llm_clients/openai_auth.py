@@ -1,11 +1,15 @@
 import importlib
+import os
+import shlex
 import subprocess
 import sys
 from pathlib import Path
 from typing import Any, Callable, Dict, Optional
 
 
-_HERMES_REPO_PATH = Path.home() / ".hermes" / "hermes-agent"
+_HERMES_REPO_PATH = Path(
+    os.getenv("HERMES_REPO_PATH", str(Path.home() / ".hermes" / "hermes-agent"))
+)
 
 
 def build_openai_runtime_config(
@@ -116,12 +120,15 @@ def _import_hermes_auth_module():
 def _command_token_provider(command: str) -> Callable[[], str]:
     def provider() -> str:
         completed = subprocess.run(
-            command,
-            shell=True,
+            shlex.split(command),
+            shell=False,
             check=True,
             capture_output=True,
             text=True,
         )
-        return completed.stdout.strip()
+        token = completed.stdout.strip()
+        if not token:
+            raise RuntimeError("OpenAI api_key_command did not return a token on stdout")
+        return token
 
     return provider

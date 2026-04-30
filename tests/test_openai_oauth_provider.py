@@ -1,4 +1,5 @@
 import importlib
+import os
 import sys
 import types
 import unittest
@@ -65,11 +66,30 @@ class TestOpenAIOAuthProvider(unittest.TestCase):
         auth_module = importlib.import_module("tradingagents.llm_clients.openai_auth")
 
         provider = auth_module.build_api_key_provider(
-            api_key_command="python -c \"print('oauth-token-from-command')\""
+            api_key_command=f"{sys.executable} -c \"print('oauth-token-from-command')\""
         )
 
         self.assertTrue(callable(provider))
         self.assertEqual(provider(), "oauth-token-from-command")
+
+    def test_api_key_command_empty_stdout_raises(self):
+        auth_module = importlib.import_module("tradingagents.llm_clients.openai_auth")
+
+        provider = auth_module.build_api_key_provider(
+            api_key_command=f"{sys.executable} -c \"print('', end='')\""
+        )
+
+        with self.assertRaises(RuntimeError):
+            provider()
+
+    def test_hermes_repo_path_can_be_overridden_by_env(self):
+        os.environ["HERMES_REPO_PATH"] = "/tmp/custom-hermes"
+        try:
+            auth_module = importlib.reload(importlib.import_module("tradingagents.llm_clients.openai_auth"))
+            self.assertEqual(str(auth_module._HERMES_REPO_PATH), "/tmp/custom-hermes")
+        finally:
+            os.environ.pop("HERMES_REPO_PATH", None)
+            importlib.reload(auth_module)
 
     def test_api_key_provider_is_forwarded_to_chat_openai(self):
         openai_client_module = self._import_openai_client_module()
