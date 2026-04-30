@@ -23,7 +23,7 @@
 
       <header class="detail-shell">
         <section class="stock-hero-card">
-          <div class="eyebrow">Equity Intelligence</div>
+          <div class="eyebrow">분석 리포트</div>
           <div class="stock-title-row">
             <div>
               <h1>{{ record.ticker }}</h1>
@@ -33,8 +33,8 @@
           </div>
           <p class="lede">{{ record.decision_summary }}</p>
           <div class="hero-actions">
-            <a class="link-button" href="#reports">리포트 읽기</a>
-            <a class="link-button secondary" href="#chart">차트 보기</a>
+            <a class="link-button" href="#reports">핵심 보기</a>
+            <a class="link-button secondary" href="#chart">차트</a>
           </div>
         </section>
 
@@ -50,12 +50,12 @@
         </aside>
       </header>
 
-      <section id="chart" class="panel market-panel professional-chart">
+      <section id="chart" class="panel market-panel market-chart">
         <div class="panel-header split">
           <div>
-            <p class="eyebrow">Professional Market Context</p>
-            <h2>전문 트레이딩 차트</h2>
-            <p>무료 오픈소스 TradingView Lightweight Charts로 캔들, 거래량, MA5/MA20/MA60 이평선을 함께 봅니다.</p>
+            <p class="eyebrow">가격 흐름</p>
+            <h2>가격 차트</h2>
+            <p>캔들, 거래량, 주요 이동평균을 한 화면에서 확인합니다.</p>
           </div>
           {% if chart.available %}
           <div class="price-ticker {{ 'positive' if chart.positive else 'negative' }}">
@@ -74,11 +74,10 @@
           <span class="legend-dot ma60"></span><span>MA60</span>
           <span class="toolbar-spacer"></span>
           <span class="chart-license">데이터 소스: {{ chart.data_source or '가격 데이터 제공처' }}</span>
-          <span class="chart-license">Lightweight Charts · Apache-2.0</span>
         </div>
         <div class="chart-grid professional">
           <div class="chart-card professional-chart-card">
-            <div id="professional-price-chart" class="trading-chart" aria-label="{{ record.ticker }} 전문 캔들 차트"></div>
+            <div id="professional-price-chart" class="trading-chart" aria-label="{{ record.ticker }} 캔들 차트"></div>
             <svg class="price-chart chart-fallback" viewBox="0 0 {{ chart.width }} {{ chart.height }}" role="img" aria-label="{{ record.ticker }} 가격 차트 fallback">
               <defs>
                 <linearGradient id="chartFill" x1="0" x2="0" y1="0" y2="1">
@@ -92,10 +91,10 @@
             <div class="chart-range"><span>{{ chart.start_date }}</span><span>{{ chart.end_date }}</span></div>
           </div>
           <dl class="chart-stats">
-            <div><dt>시작가</dt><dd>{{ "%.2f"|format(chart.first_close) }}</dd></div>
-            <div><dt>최고가</dt><dd>{{ "%.2f"|format(chart.max_close) }}</dd></div>
-            <div><dt>최저가</dt><dd>{{ "%.2f"|format(chart.min_close) }}</dd></div>
-            <div><dt>표본 수</dt><dd>{{ chart.points|length }}개</dd></div>
+            <div><dt>기간 시작</dt><dd>{{ chart.start_date }}</dd></div>
+            <div><dt>기간 종료</dt><dd>{{ chart.end_date }}</dd></div>
+            <div><dt>고가</dt><dd>{{ "%.2f"|format(chart.max_close) }}</dd></div>
+            <div><dt>저가</dt><dd>{{ "%.2f"|format(chart.min_close) }}</dd></div>
           </dl>
         </div>
         <script id="chart-payload" type="application/json">{{ chart|tojson }}</script>
@@ -110,24 +109,24 @@
       </section>
 
       <section class="insight-grid">
-        <article class="panel insight-card">
-          <p class="eyebrow">Executive Summary</p>
-          <h2>핵심 요약</h2>
+        <article class="panel insight-card priority-card">
+          <p class="eyebrow">핵심 판단</p>
+          <h2>{{ record.rating }} · {{ record.trader_action }}</h2>
           <p>{{ record.decision_summary }}</p>
         </article>
         <article class="panel insight-card">
-          <p class="eyebrow">Investment Thesis</p>
+          <p class="eyebrow">핵심 근거</p>
           <h2>투자 논리</h2>
           <p>{{ record.investment_thesis or record.reports.final_trade_decision }}</p>
         </article>
       </section>
 
-      <section class="panel">
+      <section class="panel compact-navigator">
         <div class="panel-header">
           <div>
-            <p class="eyebrow">Report Navigator</p>
-            <h2>섹션 목차</h2>
-            <p>긴 리포트를 섹션별로 접고 펼쳐서 확인합니다.</p>
+            <p class="eyebrow">상세 근거</p>
+            <h2>필요한 섹션만 빠르게 확인</h2>
+            <p>분석 근거를 시장, 뉴스/공시, 펀더멘털, 최종 결정 순서로 정리했습니다.</p>
           </div>
         </div>
         <nav class="toc">
@@ -138,7 +137,7 @@
       </section>
 
       <section id="reports" class="panel final-decision-card">
-        <div class="panel-header"><div><p class="eyebrow">Final Decision</p><h2>최종 포트폴리오 결정</h2></div></div>
+        <div class="panel-header"><div><p class="eyebrow">핵심 판단</p><h2>최종 포트폴리오 결정</h2></div></div>
         <article class="report-body">{{ record.reports.final_trade_decision }}</article>
       </section>
 
@@ -146,7 +145,7 @@
         {% if record.reports.get(key) and key != 'final_trade_decision' %}
         <section id="{{ key }}" class="panel report-section" data-section="{{ key }}">
           <details open>
-            <summary><h2>{{ title }}</h2><span>{{ record.report_lengths.get(key, 0) }}자</span></summary>
+            <summary><h2>{{ title }}</h2><span>보기</span></summary>
             <article class="report-body">{{ record.reports.get(key) }}</article>
           </details>
         </section>

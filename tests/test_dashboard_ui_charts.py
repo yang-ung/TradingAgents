@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -179,18 +181,24 @@ def test_dashboard_detail_renders_premium_stock_workspace_with_chart(tmp_path, s
 
     assert response.status_code == 200
     assert "stock-workspace" in response.text
-    assert "professional-chart" in response.text
+    assert "market-chart" in response.text
     assert "lightweight-charts" in response.text
     assert "MA5" in response.text
     assert "MA20" in response.text
     assert "MA60" in response.text
     assert "캔들" in response.text
     assert "데이터 소스" in response.text
-    assert "가격 차트" in response.text
-    assert "투자 판단" in response.text
+    assert "가격 흐름" in response.text
+    assert "핵심 판단" in response.text
+    assert "핵심 근거" in response.text
+    assert "상세 근거" in response.text
     assert "108.00" in response.text
     assert "+8.00%" in response.text
     assert "M 0 100 L 720 20" in response.text
+    assert "전문 트레이딩 차트" not in response.text
+    assert "Professional Market Context" not in response.text
+    assert "Lightweight Charts · Apache-2.0" not in response.text
+    assert not re.search(r">\d+자<", response.text)
 
 
 @pytest.mark.unit

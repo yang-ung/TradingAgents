@@ -212,7 +212,7 @@ def test_dashboard_filters_api_latest_and_management_pages(tmp_path, sample_reco
     detail = client.get(f"/runs/{latest.json()['run_id']}")
     assert detail.status_code == 200
     assert "원본 JSON" in detail.text
-    assert "섹션 목차" in detail.text
+    assert "상세 근거" in detail.text
     assert "data-section" in detail.text
 
 
