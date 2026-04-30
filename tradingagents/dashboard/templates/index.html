@@ -6,18 +6,8 @@
     <title>TradingAgents 하이브리드 대시보드</title>
     <style>
       html { background: #0b1020; }
-      body {
-        margin: 0;
-        min-height: 100vh;
-        background: linear-gradient(180deg, #0b1020 0%, #0f172a 100%);
-        color: #e8ecf8;
-        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-      }
-      .page {
-        max-width: 1480px;
-        margin: 0 auto;
-        padding: 32px 24px 80px;
-      }
+      body { margin: 0; min-height: 100vh; background: linear-gradient(180deg, #0b1020 0%, #0f172a 100%); color: #e8ecf8; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif; }
+      .page { max-width: 1480px; margin: 0 auto; padding: 32px 24px 80px; }
     </style>
     <link rel="stylesheet" href="{{ url_for('static', path='/dashboard.css') }}" />
   </head>
@@ -25,63 +15,76 @@
     <main class="page">
       <header class="hero">
         <div>
-          <p class="eyebrow">TradingAgents MVP</p>
-          <h1>하이브리드 배치 분석 대시보드</h1>
-          <p class="lede">
-            여러 종목의 저장된 분석 결과를 한눈에 비교하고, 상세 페이지에서 전체 판단 근거를 확인하세요.
-          </p>
+          <p class="eyebrow">TradingAgents Dashboard</p>
+          <h1>분석 결과 운영 대시보드</h1>
+          <p class="lede">종목별 최신 판단, 실행 히스토리, 한국 뉴스/공시 포함 여부를 한 화면에서 관리합니다.</p>
         </div>
         <dl class="meta-card">
-          <div>
-            <dt>데이터셋</dt>
-            <dd>{{ data_dir }}</dd>
-          </div>
-          <div>
-            <dt>실행 수</dt>
-            <dd>{{ runs|length }}</dd>
-          </div>
-          <div>
-            <dt>최근 갱신</dt>
-            <dd>{{ latest_generated_at or '아직 실행 기록이 없습니다' }}</dd>
-          </div>
+          <div><dt>데이터셋</dt><dd>{{ data_dir }}</dd></div>
+          <div><dt>조회 결과</dt><dd>{{ total }}건</dd></div>
+          <div><dt>최근 갱신</dt><dd>{{ latest_generated_at or '아직 실행 기록이 없습니다' }}</dd></div>
+          <div><dt>DB 상태</dt><dd>{{ health.database_rows }} rows / {{ health.payload_files }} files</dd></div>
         </dl>
       </header>
 
       <section class="panel">
         <div class="panel-header">
-          <h2>개요</h2>
-          <p>각 행은 저장된 TradingAgents 분석 결과 1건을 의미합니다.</p>
+          <h2>필터</h2>
+          <p>티커, 시장, 날짜, 등급으로 저장된 분석 결과를 좁혀볼 수 있습니다.</p>
+          <a class="link-button" href="/management">DB 관리</a>
+        </div>
+        <form class="filter-grid" method="get" action="/">
+          <label>검색어<input name="query" value="{{ filters.query }}" placeholder="티커, run id, 요약" /></label>
+          <label>티커<input name="ticker" value="{{ filters.ticker }}" placeholder="예: 005930.KS" /></label>
+          <label>시장
+            <select name="market">
+              <option value="" {% if not filters.market %}selected{% endif %}>전체</option>
+              <option value="KR" {% if filters.market == 'KR' %}selected{% endif %}>한국</option>
+              <option value="US" {% if filters.market == 'US' %}selected{% endif %}>미국</option>
+            </select>
+          </label>
+          <label>최종 등급<input name="rating" value="{{ filters.rating }}" placeholder="Buy/Hold/Sell" /></label>
+          <label>액션<input name="action" value="{{ filters.action }}" placeholder="Buy/Hold/Reduce" /></label>
+          <label>시작일<input type="date" name="trade_date_from" value="{{ filters.trade_date_from }}" /></label>
+          <label>종료일<input type="date" name="trade_date_to" value="{{ filters.trade_date_to }}" /></label>
+          <label class="checkbox"><input type="checkbox" name="latest_only" value="1" {% if filters.latest_only %}checked{% endif %} /> 종목별 최신만</label>
+          <button type="submit">적용</button>
+          <a class="link-button secondary" href="/">초기화</a>
+        </form>
+      </section>
+
+      <section class="panel">
+        <div class="panel-header">
+          <h2>분석 실행 목록</h2>
+          <p>각 행은 저장된 TradingAgents 분석 결과 1건입니다. “종목별 최신만”을 켜면 같은 종목의 최신 run만 표시됩니다.</p>
         </div>
         <div class="table-wrap">
           <table>
             <thead>
               <tr>
-                <th>티커</th>
-                <th>분석 기준일</th>
-                <th>최종 등급</th>
-                <th>트레이더 액션</th>
-                <th>리서치 의견</th>
-                <th>판단 요약</th>
-                <th>생성 시각</th>
-                <th></th>
+                <th>티커</th><th>시장</th><th>기준일</th><th>최종 등급</th><th>액션</th><th>소스</th><th>모델</th><th>판단 요약</th><th>생성 시각</th><th></th>
               </tr>
             </thead>
             <tbody>
               {% for run in runs %}
               <tr>
                 <td><strong>{{ run.ticker }}</strong></td>
+                <td><span class="pill">{{ run.market }}{% if run.exchange %}/{{ run.exchange }}{% endif %}</span></td>
                 <td>{{ run.trade_date }}</td>
                 <td><span class="pill pill-{{ run.rating|lower }}">{{ run.rating }}</span></td>
                 <td>{{ run.trader_action }}</td>
-                <td>{{ run.research_recommendation }}</td>
+                <td>
+                  {% if run.has_korean_news %}<span class="pill source">국내뉴스</span>{% endif %}
+                  {% if run.has_dart_disclosures %}<span class="pill source">DART</span>{% endif %}
+                  {% if not run.has_korean_news and not run.has_dart_disclosures %}<span class="muted">-</span>{% endif %}
+                </td>
+                <td class="mono">{{ run.quick_think_llm or '-' }} / {{ run.deep_think_llm or '-' }}</td>
                 <td class="summary">{{ run.decision_summary }}</td>
                 <td>{{ run.generated_at }}</td>
                 <td><a class="link-button" href="/runs/{{ run.run_id }}">상세 보기</a></td>
               </tr>
               {% else %}
-              <tr>
-                <td colspan="8" class="empty">저장된 실행 결과가 아직 없습니다. 먼저 배치 실행을 수행하세요.</td>
-              </tr>
+              <tr><td colspan="10" class="empty">조건에 맞는 실행 결과가 없습니다.</td></tr>
               {% endfor %}
             </tbody>
           </table>

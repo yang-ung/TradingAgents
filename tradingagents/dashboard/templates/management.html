@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>TradingAgents DB 관리</title>
+    <style>
+      html { background: #0b1020; }
+      body { margin: 0; min-height: 100vh; background: linear-gradient(180deg, #0b1020 0%, #0f172a 100%); color: #e8ecf8; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif; }
+      .page { max-width: 1080px; margin: 0 auto; padding: 32px 24px 80px; }
+    </style>
+    <link rel="stylesheet" href="{{ url_for('static', path='/dashboard.css') }}" />
+  </head>
+  <body>
+    <main class="page">
+      <p><a class="link-button secondary" href="/">← 대시보드로</a></p>
+      <header class="hero">
+        <div>
+          <p class="eyebrow">Operations</p>
+          <h1>DB 관리</h1>
+          <p class="lede">SQLite 인덱스, payload 파일, 누락/고아 artifact 상태를 점검합니다.</p>
+        </div>
+      </header>
+      <section class="panel">
+        <div class="panel-header"><h2>상태 요약</h2></div>
+        <dl class="meta-card wide">
+          <div><dt>DB 경로</dt><dd>{{ health.database_path }}</dd></div>
+          <div><dt>Runs 디렉터리</dt><dd>{{ health.runs_dir }}</dd></div>
+          <div><dt>스키마 버전</dt><dd>{{ health.schema_version }}</dd></div>
+          <div><dt>DB Row</dt><dd>{{ health.database_rows }}</dd></div>
+          <div><dt>Payload 파일</dt><dd>{{ health.payload_files }}</dd></div>
+          <div><dt>최근 갱신</dt><dd>{{ health.latest_generated_at or '-' }}</dd></div>
+        </dl>
+      </section>
+      <section class="panel">
+        <div class="panel-header"><h2>무결성 점검</h2></div>
+        <h3>누락 Payload</h3>
+        {% if health.missing_payloads %}
+          <ul>{% for item in health.missing_payloads %}<li>{{ item }}</li>{% endfor %}</ul>
+        {% else %}
+          <p class="empty">누락 Payload가 없습니다.</p>
+        {% endif %}
+        <h3>고아 Payload</h3>
+        {% if health.orphan_payloads %}
+          <ul>{% for item in health.orphan_payloads %}<li>{{ item }}</li>{% endfor %}</ul>
+        {% else %}
+          <p class="empty">고아 Payload가 없습니다.</p>
+        {% endif %}
+      </section>
+    </main>
+  </body>
+</html>

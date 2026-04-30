@@ -121,16 +121,56 @@ th {
 .pill-hold { background: rgba(245, 158, 11, 0.15); color: var(--hold); }
 .pill-underweight { background: rgba(249, 115, 22, 0.15); color: var(--underweight); }
 .pill-sell { background: rgba(239, 68, 68, 0.15); color: var(--sell); }
-.link-button, .breadcrumbs a {
+.link-button, .breadcrumbs a, button {
   color: #08111f;
   background: var(--accent);
+  border: 0;
   text-decoration: none;
   padding: 8px 12px;
   border-radius: 10px;
   font-weight: 700;
+  cursor: pointer;
 }
+.link-button.secondary { background: #273553; color: var(--text); }
 .breadcrumbs { margin-bottom: 20px; }
-.empty { text-align: center; color: var(--muted); }
+.empty, .muted { text-align: center; color: var(--muted); }
+.filter-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 14px;
+  align-items: end;
+}
+.filter-grid label {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+.filter-grid input, .filter-grid select {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #0f172a;
+  color: var(--text);
+  padding: 10px 12px;
+}
+.filter-grid .checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+}
+.filter-grid .checkbox input { width: auto; }
+.pill.source { background: rgba(125, 211, 252, 0.12); color: var(--accent); margin-right: 4px; }
+.mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; color: #cbd5e1; }
+.toc { display: flex; flex-wrap: wrap; gap: 10px; }
+.toc a { color: var(--accent); background: #0f172a; border: 1px solid var(--border); border-radius: 999px; padding: 8px 12px; text-decoration: none; }
+.report-section summary { display: flex; align-items: center; justify-content: space-between; cursor: pointer; }
+.report-section summary h2 { display: inline; margin: 0; }
+.report-body { white-space: pre-wrap; word-break: break-word; line-height: 1.75; color: #d9e2ff; }
+.meta-card.wide { width: 100%; }
 .grid.two-col {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
