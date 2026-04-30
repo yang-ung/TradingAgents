@@ -57,6 +57,48 @@ def test_price_chart_computes_moving_averages():
 
 
 @pytest.mark.unit
+def test_naver_sise_json_parser_extracts_korean_ohlcv_rows():
+    from tradingagents.dashboard.charts import _parse_naver_sise_json
+
+    text = '''[['날짜', '시가', '고가', '저가', '종가', '거래량', '외국인소진율'],
+["20260429", 219500, 228000, 218500, 226000, 20363756, 49.27],
+["20260430", 229000, 230000, 220500, 220500, 20519819, 49.27]
+]'''
+
+    assert _parse_naver_sise_json(text) == [
+        {"date": "2026-04-29", "open": 219500.0, "high": 228000.0, "low": 218500.0, "close": 226000.0, "volume": 20363756.0},
+        {"date": "2026-04-30", "open": 229000.0, "high": 230000.0, "low": 220500.0, "close": 220500.0, "volume": 20519819.0},
+    ]
+
+
+@pytest.mark.unit
+def test_korean_ticker_code_requires_six_digits():
+    from tradingagents.dashboard.charts import _korean_ticker_code
+
+    assert _korean_ticker_code("005930.KS") == "005930"
+    with pytest.raises(ValueError):
+        _korean_ticker_code("005930.KS/../../bad")
+
+
+@pytest.mark.unit
+def test_korean_ticker_chart_prefers_naver_source(monkeypatch):
+    from tradingagents.dashboard import charts
+
+    monkeypatch.setattr(
+        charts,
+        "_fetch_naver_sise_json",
+        lambda code, start, end: '[["날짜","시가","고가","저가","종가","거래량"],["20260430", 229000, 230000, 220500, 220500, 20519819]]',
+    )
+
+    chart = charts.get_price_chart("005930.KS", "2026-04-30", lookback_days=14)
+
+    assert chart["available"] is True
+    assert chart["data_source"] == "Naver Finance"
+    assert chart["currency"] == "KRW"
+    assert chart["points"][-1] == {"date": "2026-04-30", "open": 229000.0, "high": 230000.0, "low": 220500.0, "close": 220500.0, "volume": 20519819}
+
+
+@pytest.mark.unit
 def test_price_chart_normalizes_ohlc_and_rejects_negative_volume():
     from tradingagents.dashboard.charts import build_price_chart
 
@@ -143,6 +185,7 @@ def test_dashboard_detail_renders_premium_stock_workspace_with_chart(tmp_path, s
     assert "MA20" in response.text
     assert "MA60" in response.text
     assert "캔들" in response.text
+    assert "데이터 소스" in response.text
     assert "가격 차트" in response.text
     assert "투자 판단" in response.text
     assert "108.00" in response.text

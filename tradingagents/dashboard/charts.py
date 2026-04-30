@@ -1,12 +1,28 @@
 from __future__ import annotations
 
 import math
+import re
+import urllib.parse
+import urllib.request
 from datetime import date, timedelta
 from typing import Any, Iterable
 
 CHART_WIDTH = 720
 CHART_HEIGHT = 220
 CHART_PADDING = 14
+_NAVER_DAILY_CHART_URL = "https://api.finance.naver.com/siseJson.naver"
+_NAVER_HEADERS = {
+    "User-Agent": "Mozilla/5.0",
+    "Referer": "https://finance.naver.com/",
+}
+_NAVER_ROW_RE = re.compile(
+    r'\[\s*["\'](?P<date>\d{8})["\']\s*,\s*'
+    r'(?P<open>-?\d+(?:\.\d+)?)\s*,\s*'
+    r'(?P<high>-?\d+(?:\.\d+)?)\s*,\s*'
+    r'(?P<low>-?\d+(?:\.\d+)?)\s*,\s*'
+    r'(?P<close>-?\d+(?:\.\d+)?)\s*,\s*'
+    r'(?P<volume>-?\d+(?:\.\d+)?)'
+)
 
 
 def _as_float(value: Any) -> float | None:
@@ -50,6 +66,49 @@ def _normalize_ohlc(row: dict[str, Any], close: float) -> tuple[float, float, fl
     high = max(_price_or_default(row.get("high"), max(open_price, close)), open_price, close)
     low = min(_price_or_default(row.get("low"), min(open_price, close)), open_price, close)
     return open_price, high, low
+
+
+def _is_korean_ticker(ticker: str) -> bool:
+    return ticker.upper().endswith((".KS", ".KQ")) or bool(re.fullmatch(r"\d{6}", ticker.strip()))
+
+
+def _korean_ticker_code(ticker: str) -> str:
+    code = ticker.upper().removesuffix(".KS").removesuffix(".KQ").strip()
+    if not re.fullmatch(r"\d{6}", code):
+        raise ValueError("invalid_korean_ticker_code")
+    return code
+
+
+def _parse_naver_sise_json(text: str) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for match in _NAVER_ROW_RE.finditer(text):
+        raw_date = match.group("date")
+        rows.append({
+            "date": f"{raw_date[:4]}-{raw_date[4:6]}-{raw_date[6:8]}",
+            "open": float(match.group("open")),
+            "high": float(match.group("high")),
+            "low": float(match.group("low")),
+            "close": float(match.group("close")),
+            "volume": float(match.group("volume")),
+        })
+    return rows
+
+
+def _fetch_naver_sise_json(code: str, start: date, end: date) -> str:
+    query = urllib.parse.urlencode({
+        "symbol": code,
+        "requestType": 1,
+        "startTime": start.strftime("%Y%m%d"),
+        "endTime": end.strftime("%Y%m%d"),
+        "timeframe": "day",
+    })
+    request = urllib.request.Request(f"{_NAVER_DAILY_CHART_URL}?{query}", headers=_NAVER_HEADERS)
+    with urllib.request.urlopen(request, timeout=12) as response:
+        return response.read().decode("utf-8", errors="replace")
+
+
+def _get_naver_price_rows(ticker: str, start: date, end: date) -> list[dict[str, Any]]:
+    return _parse_naver_sise_json(_fetch_naver_sise_json(_korean_ticker_code(ticker), start, end))
 
 
 def build_price_chart(ticker: str, rows: Iterable[dict[str, Any]]) -> dict[str, Any]:
@@ -149,15 +208,25 @@ def build_price_chart(ticker: str, rows: Iterable[dict[str, Any]]) -> dict[str, 
 
 def get_price_chart(ticker: str, trade_date: str, lookback_days: int = 180) -> dict[str, Any]:
     try:
-        import yfinance as yf
-    except Exception:  # pragma: no cover - environment dependent
-        return {"available": False, "ticker": ticker, "reason": "yfinance_unavailable", "points": []}
-
-    try:
         end = date.fromisoformat(trade_date) + timedelta(days=1)
     except ValueError:
         end = date.today() + timedelta(days=1)
     start = end - timedelta(days=lookback_days)
+
+    if _is_korean_ticker(ticker):
+        try:
+            rows = _get_naver_price_rows(ticker, start, end)
+            chart = build_price_chart(ticker, rows)
+            chart["currency"] = "KRW"
+            chart["data_source"] = "Naver Finance"
+            return chart
+        except Exception:
+            pass
+
+    try:
+        import yfinance as yf
+    except Exception:  # pragma: no cover - environment dependent
+        return {"available": False, "ticker": ticker, "reason": "price_source_unavailable", "points": []}
 
     try:
         history = yf.Ticker(ticker).history(start=start.isoformat(), end=end.isoformat(), auto_adjust=True)
@@ -182,5 +251,6 @@ def get_price_chart(ticker: str, trade_date: str, lookback_days: int = 180) -> d
         return {"available": False, "ticker": ticker, "reason": "history_parse_failed", "points": []}
 
     chart = build_price_chart(ticker, rows)
-    chart["currency"] = "KRW" if ticker.upper().endswith((".KS", ".KQ")) else "USD"
+    chart["currency"] = "KRW" if _is_korean_ticker(ticker) else "USD"
+    chart["data_source"] = "Yahoo Finance"
     return chart
