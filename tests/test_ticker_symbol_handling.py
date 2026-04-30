@@ -16,6 +16,10 @@ class TickerSymbolHandlingTests(unittest.TestCase):
         with patch("tradingagents.ticker_utils._lookup_krx_market", return_value="코스피"):
             self.assertEqual(normalize_ticker_symbol(" 005930 "), "005930.KS")
 
+    def test_normalize_ticker_symbol_accepts_krx_yuga_market_label(self):
+        with patch("tradingagents.ticker_utils._lookup_krx_market", return_value="유가"):
+            self.assertEqual(normalize_ticker_symbol("005930"), "005930.KS")
+
     def test_normalize_ticker_symbol_falls_back_to_kosdaq_code(self):
         with patch("tradingagents.ticker_utils._lookup_krx_market", return_value="코스닥"):
             self.assertEqual(normalize_ticker_symbol("035760"), "035760.KQ")

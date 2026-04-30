@@ -4,6 +4,12 @@ import yfinance as yf
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
 
+from tradingagents.ticker_utils import normalize_ticker_symbol
+
+from .korean_market_news import (
+    get_korean_market_company_news,
+    get_korean_market_disclosures,
+)
 from .stockstats_utils import yf_retry
 
 
@@ -64,44 +70,62 @@ def get_news_yfinance(
     Returns:
         Formatted string containing news articles
     """
+    ticker = normalize_ticker_symbol(ticker)
+    sections: list[str] = []
+    yahoo_error: str | None = None
+
     try:
         stock = yf.Ticker(ticker)
         news = yf_retry(lambda: stock.get_news(count=20))
 
-        if not news:
-            return f"No news found for {ticker}"
+        if news:
+            # Parse date range for filtering
+            start_dt = datetime.strptime(start_date, "%Y-%m-%d")
+            end_dt = datetime.strptime(end_date, "%Y-%m-%d")
 
-        # Parse date range for filtering
-        start_dt = datetime.strptime(start_date, "%Y-%m-%d")
-        end_dt = datetime.strptime(end_date, "%Y-%m-%d")
+            news_str = ""
+            filtered_count = 0
 
-        news_str = ""
-        filtered_count = 0
+            for article in news:
+                data = _extract_article_data(article)
 
-        for article in news:
-            data = _extract_article_data(article)
+                # Filter by date if publish time is available
+                if data["pub_date"]:
+                    pub_date_naive = data["pub_date"].replace(tzinfo=None)
+                    if not (start_dt <= pub_date_naive <= end_dt + relativedelta(days=1)):
+                        continue
 
-            # Filter by date if publish time is available
-            if data["pub_date"]:
-                pub_date_naive = data["pub_date"].replace(tzinfo=None)
-                if not (start_dt <= pub_date_naive <= end_dt + relativedelta(days=1)):
-                    continue
+                news_str += f"### {data['title']} (source: {data['publisher']})\n"
+                if data["summary"]:
+                    news_str += f"{data['summary']}\n"
+                if data["link"]:
+                    news_str += f"Link: {data['link']}\n"
+                news_str += "\n"
+                filtered_count += 1
 
-            news_str += f"### {data['title']} (source: {data['publisher']})\n"
-            if data["summary"]:
-                news_str += f"{data['summary']}\n"
-            if data["link"]:
-                news_str += f"Link: {data['link']}\n"
-            news_str += "\n"
-            filtered_count += 1
-
-        if filtered_count == 0:
-            return f"No news found for {ticker} between {start_date} and {end_date}"
-
-        return f"## {ticker} News, from {start_date} to {end_date}:\n\n{news_str}"
-
+            if filtered_count > 0:
+                sections.append(f"## Yahoo Finance Coverage\n\n{news_str}".strip())
     except Exception as e:
-        return f"Error fetching news for {ticker}: {str(e)}"
+        yahoo_error = f"Error fetching news for {ticker}: {str(e)}"
+
+    if ticker.endswith((".KS", ".KQ")):
+        for builder in (get_korean_market_company_news, get_korean_market_disclosures):
+            try:
+                section = builder(ticker, start_date, end_date)
+            except Exception:
+                section = ""
+            if section:
+                sections.append(section)
+
+    if not sections:
+        if yahoo_error:
+            return yahoo_error
+        return f"No news found for {ticker} between {start_date} and {end_date}"
+
+    if len(sections) == 1 and sections[0].startswith("### "):
+        return f"## {ticker} News, from {start_date} to {end_date}:\n\n{sections[0]}"
+
+    return f"## {ticker} News, from {start_date} to {end_date}:\n\n" + "\n\n".join(sections)
 
 
 def get_global_news_yfinance(
