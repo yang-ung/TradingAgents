@@ -5,35 +5,117 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{{ record.ticker }} 분석 리포트 - {{ record.trade_date }}</title>
     <style>
-      html { background: #0b1020; }
-      body { margin: 0; min-height: 100vh; background: linear-gradient(180deg, #0b1020 0%, #0f172a 100%); color: #e8ecf8; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif; }
-      .page { max-width: 1240px; margin: 0 auto; padding: 32px 24px 80px; }
+      html { background: #08090a; }
+      body { margin: 0; min-height: 100vh; background: radial-gradient(circle at 20% -10%, rgba(113,112,255,0.22), transparent 32rem), linear-gradient(180deg, #08090a 0%, #0f1011 100%); color: #f7f8f8; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif; }
+      .page { max-width: 1440px; margin: 0 auto; padding: 28px 24px 80px; }
     </style>
     <link rel="stylesheet" href="{{ url_for('static', path='/dashboard.css') }}" />
   </head>
   <body>
-    <main class="page">
-      <p><a class="link-button secondary" href="/">← 목록으로</a> <a class="link-button secondary" href="/runs/{{ record.run_id }}/json">원본 JSON</a></p>
-      <header class="hero">
+    <main class="page stock-workspace">
+      <nav class="top-nav">
         <div>
-          <p class="eyebrow">{{ record.run_id }}</p>
-          <h1>{{ record.ticker }} 분석 리포트</h1>
-          <p class="lede">{{ record.decision_summary }}</p>
+          <a class="link-button secondary" href="/">← 대시보드</a>
+          <a class="link-button ghost" href="/runs/{{ record.run_id }}/json">원본 JSON</a>
         </div>
-        <dl class="meta-card">
-          <div><dt>기준일</dt><dd>{{ record.trade_date }}</dd></div>
-          <div><dt>최종 등급</dt><dd><span class="pill pill-{{ record.rating|lower }}">{{ record.rating }}</span></dd></div>
-          <div><dt>트레이더 액션</dt><dd>{{ record.trader_action }}</dd></div>
-          <div><dt>생성 시각</dt><dd>{{ record.generated_at }}</dd></div>
-          <div><dt>Quick / Deep</dt><dd>{{ record.metadata.quick_think_llm or '-' }} / {{ record.metadata.deep_think_llm or '-' }}</dd></div>
-          <div><dt>소요 시간</dt><dd>{{ record.metadata.elapsed_seconds or '-' }}초</dd></div>
-        </dl>
+        <span class="mono">{{ record.run_id }}</span>
+      </nav>
+
+      <header class="detail-shell">
+        <section class="stock-hero-card">
+          <div class="eyebrow">Equity Intelligence</div>
+          <div class="stock-title-row">
+            <div>
+              <h1>{{ record.ticker }}</h1>
+              <p>{{ record.trade_date }} 기준 TradingAgents 분석 리포트</p>
+            </div>
+            <span class="pill pill-{{ record.rating|lower }} rating-badge">{{ record.rating }}</span>
+          </div>
+          <p class="lede">{{ record.decision_summary }}</p>
+          <div class="hero-actions">
+            <a class="link-button" href="#reports">리포트 읽기</a>
+            <a class="link-button secondary" href="#chart">차트 보기</a>
+          </div>
+        </section>
+
+        <aside class="decision-card">
+          <p class="eyebrow">투자 판단</p>
+          <dl class="metric-list">
+            <div><dt>트레이더 액션</dt><dd>{{ record.trader_action }}</dd></div>
+            <div><dt>리서치 의견</dt><dd>{{ record.research_recommendation }}</dd></div>
+            <div><dt>목표가</dt><dd>{% if record.price_target %}{{ "%.2f"|format(record.price_target) }}{% else %}-{% endif %}</dd></div>
+            <div><dt>투자 기간</dt><dd>{{ record.time_horizon or '-' }}</dd></div>
+            <div><dt>모델</dt><dd>{{ record.metadata.quick_think_llm or '-' }} / {{ record.metadata.deep_think_llm or '-' }}</dd></div>
+          </dl>
+        </aside>
       </header>
+
+      <section id="chart" class="panel market-panel">
+        <div class="panel-header split">
+          <div>
+            <p class="eyebrow">Market Context</p>
+            <h2>가격 차트</h2>
+            <p>분석 기준일까지의 최근 가격 흐름입니다. 데이터 수집 실패 시에도 리포트 본문은 정상 표시됩니다.</p>
+          </div>
+          {% if chart.available %}
+          <div class="price-ticker {{ 'positive' if chart.positive else 'negative' }}">
+            <span>{{ chart.currency or '' }}</span>
+            <strong>{{ "%.2f"|format(chart.latest_close) }}</strong>
+            <em>{% if chart.change >= 0 %}+{% endif %}{{ "%.2f"|format(chart.change) }} / {% if chart.change_percent >= 0 %}+{% endif %}{{ "%.2f"|format(chart.change_percent) }}%</em>
+          </div>
+          {% endif %}
+        </div>
+
+        {% if chart.available %}
+        <div class="chart-grid">
+          <div class="chart-card">
+            <svg class="price-chart" viewBox="0 0 {{ chart.width }} {{ chart.height }}" role="img" aria-label="{{ record.ticker }} 가격 차트">
+              <defs>
+                <linearGradient id="chartFill" x1="0" x2="0" y1="0" y2="1">
+                  <stop offset="0%" stop-color="#7170ff" stop-opacity="0.42" />
+                  <stop offset="100%" stop-color="#7170ff" stop-opacity="0.02" />
+                </linearGradient>
+              </defs>
+              <path d="{{ chart.area_path }}" fill="url(#chartFill)" />
+              <path d="{{ chart.path }}" fill="none" stroke="#8b8cff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+            <div class="chart-range"><span>{{ chart.start_date }}</span><span>{{ chart.end_date }}</span></div>
+          </div>
+          <dl class="chart-stats">
+            <div><dt>시작가</dt><dd>{{ "%.2f"|format(chart.first_close) }}</dd></div>
+            <div><dt>최고가</dt><dd>{{ "%.2f"|format(chart.max_close) }}</dd></div>
+            <div><dt>최저가</dt><dd>{{ "%.2f"|format(chart.min_close) }}</dd></div>
+            <div><dt>표본 수</dt><dd>{{ chart.points|length }}개</dd></div>
+          </dl>
+        </div>
+        {% else %}
+        <div class="empty-state">
+          <strong>차트 데이터를 가져오지 못했습니다.</strong>
+          <p>{{ chart.reason or '일시적인 데이터 소스 문제일 수 있습니다.' }}</p>
+        </div>
+        {% endif %}
+      </section>
+
+      <section class="insight-grid">
+        <article class="panel insight-card">
+          <p class="eyebrow">Executive Summary</p>
+          <h2>핵심 요약</h2>
+          <p>{{ record.decision_summary }}</p>
+        </article>
+        <article class="panel insight-card">
+          <p class="eyebrow">Investment Thesis</p>
+          <h2>투자 논리</h2>
+          <p>{{ record.investment_thesis or record.reports.final_trade_decision }}</p>
+        </article>
+      </section>
 
       <section class="panel">
         <div class="panel-header">
-          <h2>섹션 목차</h2>
-          <p>긴 리포트를 섹션별로 접고 펼쳐서 확인합니다.</p>
+          <div>
+            <p class="eyebrow">Report Navigator</p>
+            <h2>섹션 목차</h2>
+            <p>긴 리포트를 섹션별로 접고 펼쳐서 확인합니다.</p>
+          </div>
         </div>
         <nav class="toc">
           {% for key, title in sections %}
@@ -42,8 +124,8 @@
         </nav>
       </section>
 
-      <section class="panel">
-        <div class="panel-header"><h2>최종 포트폴리오 결정</h2></div>
+      <section id="reports" class="panel final-decision-card">
+        <div class="panel-header"><div><p class="eyebrow">Final Decision</p><h2>최종 포트폴리오 결정</h2></div></div>
         <article class="report-body">{{ record.reports.final_trade_decision }}</article>
       </section>
 

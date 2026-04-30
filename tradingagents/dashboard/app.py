@@ -13,6 +13,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from .batch import DEFAULT_ARTIFACT_DIR, run_batch_analysis
+from .charts import get_price_chart
 from .storage import AnalysisRepository
 
 TEMPLATES_DIR = Path(__file__).parent / "templates"
@@ -206,12 +207,14 @@ def create_dashboard_app(
             ("trader_investment_decision", "트레이더 제안"),
             ("final_trade_decision", "최종 결정"),
         ]
+        chart = get_price_chart(record["ticker"], record["trade_date"])
         return templates.TemplateResponse(
             request,
             "detail.html",
             {
                 "record": record,
                 "sections": sections,
+                "chart": chart,
             },
         )
 
@@ -266,6 +269,13 @@ def create_dashboard_app(
         if record is None:
             raise HTTPException(status_code=404, detail=f"Unknown run_id: {run_id}")
         return record
+
+    @app.get("/api/runs/{run_id}/chart")
+    def api_run_chart(run_id: str):
+        record = repository.get_run(run_id)
+        if record is None:
+            raise HTTPException(status_code=404, detail=f"Unknown run_id: {run_id}")
+        return get_price_chart(record["ticker"], record["trade_date"])
 
     @app.get("/api/tickers/{ticker}/latest")
     def api_latest_ticker(ticker: str):
