@@ -181,6 +181,7 @@ def test_dashboard_detail_renders_premium_stock_workspace_with_chart(tmp_path, s
 
     assert response.status_code == 200
     assert "stock-workspace" in response.text
+    assert "NVDA" in response.text
     assert "market-chart" in response.text
     assert "lightweight-charts" in response.text
     assert "MA5" in response.text
@@ -199,6 +200,61 @@ def test_dashboard_detail_renders_premium_stock_workspace_with_chart(tmp_path, s
     assert "Professional Market Context" not in response.text
     assert "Lightweight Charts · Apache-2.0" not in response.text
     assert not re.search(r">\d+자<", response.text)
+
+
+@pytest.mark.unit
+def test_dashboard_detail_shows_readable_company_name_for_korean_ticker(tmp_path, sample_record, monkeypatch):
+    from tradingagents.dashboard import app as dashboard_app
+
+    monkeypatch.setattr(
+        dashboard_app,
+        "get_price_chart",
+        lambda ticker, trade_date, lookback_days=180: {"available": False, "reason": "no_price_data"},
+    )
+    repository = AnalysisRepository(tmp_path)
+    stored = repository.save(dict(sample_record, ticker="005930.KS"))
+    client = TestClient(create_dashboard_app(tmp_path))
+
+    response = client.get(f"/runs/{stored['run_id']}")
+
+    assert response.status_code == 200
+    assert "<h1>삼성전자</h1>" in response.text
+    assert "005930.KS" in response.text
+
+
+@pytest.mark.unit
+def test_dashboard_detail_uses_metadata_company_name_before_ticker(tmp_path, sample_record, monkeypatch):
+    from tradingagents.dashboard import app as dashboard_app
+
+    monkeypatch.setattr(
+        dashboard_app,
+        "get_price_chart",
+        lambda ticker, trade_date, lookback_days=180: {"available": False, "reason": "no_price_data"},
+    )
+    repository = AnalysisRepository(tmp_path)
+    record = dict(sample_record, ticker="005930.KS", metadata={"company_name": "삼성전자"})
+    stored = repository.save(record)
+    client = TestClient(create_dashboard_app(tmp_path))
+
+    response = client.get(f"/runs/{stored['run_id']}")
+
+    assert response.status_code == 200
+    assert "<h1>삼성전자</h1>" in response.text
+    assert "005930.KS" in response.text
+
+
+@pytest.mark.unit
+def test_dashboard_detail_tolerates_malformed_name_sources(tmp_path, sample_record, monkeypatch):
+    from tradingagents.dashboard.app import _display_company_name
+
+    assert _display_company_name({"ticker": "UNKNOWN", "metadata": "bad", "raw_state": ["bad"]}) == "UNKNOWN"
+
+
+@pytest.mark.unit
+def test_dashboard_detail_ignores_ticker_code_metadata_name_for_display():
+    from tradingagents.dashboard.app import _display_company_name
+
+    assert _display_company_name({"ticker": "005930.KS", "metadata": {"name": "005930"}}) == "삼성전자"
 
 
 @pytest.mark.unit

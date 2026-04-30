@@ -26,8 +26,8 @@
           <div class="eyebrow">분석 리포트</div>
           <div class="stock-title-row">
             <div>
-              <h1>{{ record.ticker }}</h1>
-              <p>{{ record.trade_date }} 기준 TradingAgents 분석 리포트</p>
+              <h1>{{ display_name }}</h1>
+              <p><span class="ticker-code">{{ record.ticker }}</span> · {{ record.trade_date }} 기준 TradingAgents 분석 리포트</p>
             </div>
             <span class="pill pill-{{ record.rating|lower }} rating-badge">{{ record.rating }}</span>
           </div>

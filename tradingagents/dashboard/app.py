@@ -23,6 +23,32 @@ MAX_BATCH_TICKERS = int(os.getenv("TRADINGAGENTS_DASHBOARD_MAX_BATCH_TICKERS", "
 MAX_ACTIVE_BATCH_JOBS = int(os.getenv("TRADINGAGENTS_DASHBOARD_MAX_ACTIVE_BATCH_JOBS", "3"))
 BATCH_WORKERS = int(os.getenv("TRADINGAGENTS_DASHBOARD_BATCH_WORKERS", "1"))
 TICKER_PATTERN = re.compile(r"^[A-Za-z0-9._-]{1,20}$")
+_KNOWN_COMPANY_NAMES = {
+    "005930": "삼성전자",
+    "005930.KS": "삼성전자",
+    "000660": "SK하이닉스",
+    "000660.KS": "SK하이닉스",
+    "035420": "NAVER",
+    "035420.KS": "NAVER",
+    "035720": "카카오",
+    "035720.KQ": "카카오",
+    "005380": "현대차",
+    "005380.KS": "현대차",
+}
+
+
+def _display_company_name(record: dict) -> str:
+    ticker = str(record.get("ticker", "")).upper()
+    ticker_code = ticker.split(".", 1)[0]
+    sources = [record.get("metadata", {}) or {}, record.get("raw_state", {}) or {}]
+    for source in sources:
+        if not isinstance(source, dict):
+            continue
+        for key in ("company_name", "display_name", "name"):
+            value = str(source.get(key, "")).strip()
+            if value and value.upper() not in {ticker, ticker_code}:
+                return value
+    return _KNOWN_COMPANY_NAMES.get(ticker, _KNOWN_COMPANY_NAMES.get(ticker_code, ticker))
 
 
 def _bool_query(value: bool | str | None) -> bool:
@@ -213,6 +239,7 @@ def create_dashboard_app(
             "detail.html",
             {
                 "record": record,
+                "display_name": _display_company_name(record),
                 "sections": sections,
                 "chart": chart,
             },

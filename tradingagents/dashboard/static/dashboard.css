@@ -320,6 +320,11 @@ tr:hover td { background: rgba(255,255,255,0.025); }
   gap: 20px;
 }
 .stock-title-row p { color: var(--muted); margin: 10px 0 0; }
+.ticker-code {
+  color: var(--text-soft);
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.94em;
+}
 .hero-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 22px; }
 .metric-list, .chart-stats { margin: 0; }
 .market-panel { overflow: hidden; }
