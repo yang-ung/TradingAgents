@@ -12,10 +12,10 @@ def test_price_chart_builds_series_svg_path_and_stats():
     from tradingagents.dashboard.charts import build_price_chart
 
     rows = [
-        {"date": "2026-04-24", "close": 100.0, "volume": 1000},
-        {"date": "2026-04-25", "close": 103.0, "volume": 1200},
-        {"date": "2026-04-26", "close": 101.0, "volume": 900},
-        {"date": "2026-04-27", "close": 108.0, "volume": 1500},
+        {"date": "2026-04-24", "open": 98.0, "high": 104.0, "low": 96.0, "close": 100.0, "volume": 1000},
+        {"date": "2026-04-25", "open": 100.0, "high": 105.0, "low": 99.0, "close": 103.0, "volume": 1200},
+        {"date": "2026-04-26", "open": 103.0, "high": 104.0, "low": 100.0, "close": 101.0, "volume": 900},
+        {"date": "2026-04-27", "open": 101.0, "high": 109.0, "low": 100.0, "close": 108.0, "volume": 1500},
     ]
 
     chart = build_price_chart("005930.KS", rows)
@@ -31,6 +31,43 @@ def test_price_chart_builds_series_svg_path_and_stats():
     assert chart["change_percent"] == 8.0
     assert chart["min_close"] == 100.0
     assert chart["max_close"] == 108.0
+    assert chart["candles"] == [
+        {"time": "2026-04-24", "open": 98.0, "high": 104.0, "low": 96.0, "close": 100.0},
+        {"time": "2026-04-25", "open": 100.0, "high": 105.0, "low": 99.0, "close": 103.0},
+        {"time": "2026-04-26", "open": 103.0, "high": 104.0, "low": 100.0, "close": 101.0},
+        {"time": "2026-04-27", "open": 101.0, "high": 109.0, "low": 100.0, "close": 108.0},
+    ]
+    assert chart["volume"][-1] == {"time": "2026-04-27", "value": 1500, "color": "rgba(34, 197, 94, 0.42)"}
+    assert chart["moving_averages"]["ma5"] == []
+    assert chart["moving_average_periods"] == [5, 20, 60]
+
+
+@pytest.mark.unit
+def test_price_chart_computes_moving_averages():
+    from tradingagents.dashboard.charts import build_price_chart
+
+    rows = [{"date": f"2026-04-{day:02d}", "close": float(day), "volume": day * 100} for day in range(1, 22)]
+
+    chart = build_price_chart("NVDA", rows)
+
+    assert chart["moving_averages"]["ma5"][0] == {"time": "2026-04-05", "value": 3.0}
+    assert chart["moving_averages"]["ma20"][0] == {"time": "2026-04-20", "value": 10.5}
+    assert chart["moving_averages"]["ma60"] == []
+    assert chart["candles"][0] == {"time": "2026-04-01", "open": 1.0, "high": 1.0, "low": 1.0, "close": 1.0}
+
+
+@pytest.mark.unit
+def test_price_chart_normalizes_ohlc_and_rejects_negative_volume():
+    from tradingagents.dashboard.charts import build_price_chart
+
+    chart = build_price_chart(
+        "ZERO",
+        [{"date": "2026-04-01", "open": 0.0, "high": 1.0, "low": 1.0, "close": 0.5, "volume": -1}],
+    )
+
+    assert chart["points"] == [{"date": "2026-04-01", "open": 0.0, "high": 1.0, "low": 0.0, "close": 0.5}]
+    assert chart["candles"] == [{"time": "2026-04-01", "open": 0.0, "high": 1.0, "low": 0.0, "close": 0.5}]
+    assert chart["volume"] == []
 
 
 @pytest.mark.unit
@@ -47,7 +84,7 @@ def test_price_chart_drops_non_finite_prices_and_volume():
     )
 
     assert chart["available"] is True
-    assert chart["points"] == [{"date": "2026-04-25", "close": 101.0}]
+    assert chart["points"] == [{"date": "2026-04-25", "open": 101.0, "high": 101.0, "low": 101.0, "close": 101.0}]
     assert "nan" not in chart["path"].lower()
     assert "inf" not in chart["path"].lower()
 
@@ -100,6 +137,12 @@ def test_dashboard_detail_renders_premium_stock_workspace_with_chart(tmp_path, s
 
     assert response.status_code == 200
     assert "stock-workspace" in response.text
+    assert "professional-chart" in response.text
+    assert "lightweight-charts" in response.text
+    assert "MA5" in response.text
+    assert "MA20" in response.text
+    assert "MA60" in response.text
+    assert "캔들" in response.text
     assert "가격 차트" in response.text
     assert "투자 판단" in response.text
     assert "108.00" in response.text

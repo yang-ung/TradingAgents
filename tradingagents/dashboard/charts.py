@@ -27,20 +27,67 @@ def _format_date(value: Any) -> str:
     return str(value)[:10]
 
 
+def _rounded(value: float) -> float:
+    return round(value, 4)
+
+
+def _moving_average(points: list[dict[str, Any]], period: int) -> list[dict[str, Any]]:
+    series: list[dict[str, Any]] = []
+    closes = [float(point["close"]) for point in points]
+    for index in range(period - 1, len(points)):
+        window = closes[index - period + 1 : index + 1]
+        series.append({"time": points[index]["date"], "value": round(sum(window) / period, 4)})
+    return series
+
+
+def _price_or_default(value: Any, default: float) -> float:
+    parsed = _as_float(value)
+    return default if parsed is None else parsed
+
+
+def _normalize_ohlc(row: dict[str, Any], close: float) -> tuple[float, float, float]:
+    open_price = _price_or_default(row.get("open"), close)
+    high = max(_price_or_default(row.get("high"), max(open_price, close)), open_price, close)
+    low = min(_price_or_default(row.get("low"), min(open_price, close)), open_price, close)
+    return open_price, high, low
+
+
 def build_price_chart(ticker: str, rows: Iterable[dict[str, Any]]) -> dict[str, Any]:
     points: list[dict[str, Any]] = []
+    candles: list[dict[str, Any]] = []
+    volume_series: list[dict[str, Any]] = []
     for row in rows:
         close = _as_float(row.get("close"))
         if close is None:
             continue
+        open_price, high, low = _normalize_ohlc(row, close)
+        trade_date = str(row.get("date") or "")
         point = {
-            "date": str(row.get("date") or ""),
-            "close": round(close, 4),
+            "date": trade_date,
+            "open": _rounded(open_price),
+            "high": _rounded(high),
+            "low": _rounded(low),
+            "close": _rounded(close),
         }
         volume = _as_float(row.get("volume"))
+        if volume is not None and volume < 0:
+            volume = None
         if volume is not None:
             point["volume"] = int(volume)
         points.append(point)
+        candles.append({
+            "time": trade_date,
+            "open": point["open"],
+            "high": point["high"],
+            "low": point["low"],
+            "close": point["close"],
+        })
+        if volume is not None:
+            volume_series.append({
+                "time": trade_date,
+                "value": int(volume),
+                "color": "rgba(34, 197, 94, 0.42)" if close >= open_price else "rgba(239, 68, 68, 0.38)",
+            })
 
     if not points:
         return {"available": False, "ticker": ticker, "reason": "no_price_data", "points": []}
@@ -75,10 +122,15 @@ def build_price_chart(ticker: str, rows: Iterable[dict[str, Any]]) -> dict[str, 
 
     change = latest_close - first_close
     change_percent = (change / first_close * 100) if first_close else 0.0
+    moving_average_periods = [5, 20, 60]
     return {
         "available": True,
         "ticker": ticker,
         "points": points,
+        "candles": candles,
+        "volume": volume_series,
+        "moving_average_periods": moving_average_periods,
+        "moving_averages": {f"ma{period}": _moving_average(points, period) for period in moving_average_periods},
         "path": path,
         "area_path": area_path,
         "latest_close": round(latest_close, 4),
@@ -120,6 +172,9 @@ def get_price_chart(ticker: str, trade_date: str, lookback_days: int = 180) -> d
                 continue
             rows.append({
                 "date": _format_date(index),
+                "open": _as_float(row.get("Open")),
+                "high": _as_float(row.get("High")),
+                "low": _as_float(row.get("Low")),
                 "close": close,
                 "volume": _as_float(row.get("Volume")),
             })

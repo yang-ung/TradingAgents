@@ -50,12 +50,12 @@
         </aside>
       </header>
 
-      <section id="chart" class="panel market-panel">
+      <section id="chart" class="panel market-panel professional-chart">
         <div class="panel-header split">
           <div>
-            <p class="eyebrow">Market Context</p>
-            <h2>가격 차트</h2>
-            <p>분석 기준일까지의 최근 가격 흐름입니다. 데이터 수집 실패 시에도 리포트 본문은 정상 표시됩니다.</p>
+            <p class="eyebrow">Professional Market Context</p>
+            <h2>전문 트레이딩 차트</h2>
+            <p>무료 오픈소스 TradingView Lightweight Charts로 캔들, 거래량, MA5/MA20/MA60 이평선을 함께 봅니다.</p>
           </div>
           {% if chart.available %}
           <div class="price-ticker {{ 'positive' if chart.positive else 'negative' }}">
@@ -67,9 +67,18 @@
         </div>
 
         {% if chart.available %}
-        <div class="chart-grid">
-          <div class="chart-card">
-            <svg class="price-chart" viewBox="0 0 {{ chart.width }} {{ chart.height }}" role="img" aria-label="{{ record.ticker }} 가격 차트">
+        <div class="chart-toolbar" aria-label="차트 보조지표">
+          <span class="toolbar-label">캔들</span>
+          <span class="legend-dot ma5"></span><span>MA5</span>
+          <span class="legend-dot ma20"></span><span>MA20</span>
+          <span class="legend-dot ma60"></span><span>MA60</span>
+          <span class="toolbar-spacer"></span>
+          <span class="chart-license">Lightweight Charts · Apache-2.0</span>
+        </div>
+        <div class="chart-grid professional">
+          <div class="chart-card professional-chart-card">
+            <div id="professional-price-chart" class="trading-chart" aria-label="{{ record.ticker }} 전문 캔들 차트"></div>
+            <svg class="price-chart chart-fallback" viewBox="0 0 {{ chart.width }} {{ chart.height }}" role="img" aria-label="{{ record.ticker }} 가격 차트 fallback">
               <defs>
                 <linearGradient id="chartFill" x1="0" x2="0" y1="0" y2="1">
                   <stop offset="0%" stop-color="#7170ff" stop-opacity="0.42" />
@@ -88,6 +97,9 @@
             <div><dt>표본 수</dt><dd>{{ chart.points|length }}개</dd></div>
           </dl>
         </div>
+        <script id="chart-payload" type="application/json">{{ chart|tojson }}</script>
+        <script src="https://unpkg.com/lightweight-charts@5.2.0/dist/lightweight-charts.standalone.production.js" defer></script>
+        <script src="{{ url_for('static', path='/professional-chart.js') }}" defer></script>
         {% else %}
         <div class="empty-state">
           <strong>차트 데이터를 가져오지 못했습니다.</strong>
