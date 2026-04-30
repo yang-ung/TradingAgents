@@ -2,13 +2,19 @@ from __future__ import annotations
 
 import json
 import sqlite3
+import uuid
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence
 
 from .extract import dump_record, load_record
 from .models import AnalysisRecord
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
+
+
+def _utc_now_iso() -> str:
+    return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
 
 
 class AnalysisRepository:
@@ -20,8 +26,10 @@ class AnalysisRepository:
         self._ensure_schema()
 
     def _connect(self) -> sqlite3.Connection:
-        connection = sqlite3.connect(self.db_path)
+        connection = sqlite3.connect(self.db_path, timeout=30)
         connection.row_factory = sqlite3.Row
+        connection.execute("PRAGMA busy_timeout = 30000")
+        connection.execute("PRAGMA journal_mode = WAL")
         return connection
 
     def _ensure_schema(self) -> None:
@@ -74,9 +82,38 @@ class AnalysisRepository:
             connection.execute(
                 "CREATE INDEX IF NOT EXISTS idx_analyses_archived_generated_at ON analyses(archived, generated_at DESC)"
             )
+            self._ensure_batch_jobs_schema(connection)
             self._backfill_metadata_columns(connection)
             connection.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
             connection.commit()
+
+    def _ensure_batch_jobs_schema(self, connection: sqlite3.Connection) -> None:
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS batch_jobs (
+                job_id TEXT PRIMARY KEY,
+                status TEXT NOT NULL,
+                tickers_json TEXT NOT NULL,
+                trade_date TEXT NOT NULL,
+                use_hermes_codex_auth INTEGER NOT NULL DEFAULT 0,
+                debug INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL,
+                started_at TEXT NOT NULL DEFAULT '',
+                finished_at TEXT NOT NULL DEFAULT '',
+                completed INTEGER NOT NULL DEFAULT 0,
+                failed_count INTEGER NOT NULL DEFAULT 0,
+                run_ids_json TEXT NOT NULL DEFAULT '[]',
+                summary_json TEXT NOT NULL DEFAULT '{}',
+                error TEXT NOT NULL DEFAULT ''
+            )
+            """
+        )
+        connection.execute(
+            "CREATE INDEX IF NOT EXISTS idx_batch_jobs_status_created_at ON batch_jobs(status, created_at DESC)"
+        )
+        connection.execute(
+            "CREATE INDEX IF NOT EXISTS idx_batch_jobs_trade_date_created_at ON batch_jobs(trade_date, created_at DESC)"
+        )
 
     def _backfill_metadata_columns(self, connection: sqlite3.Connection) -> None:
         rows = connection.execute(
@@ -413,6 +450,156 @@ class AnalysisRepository:
             except Exception as exc:  # pragma: no cover - defensive maintenance path
                 failed.append({"path": str(path), "error": str(exc)})
         return {"indexed": indexed, "failed": failed}
+
+    def create_batch_job(
+        self,
+        *,
+        tickers: Sequence[str],
+        trade_date: str,
+        use_hermes_codex_auth: bool = False,
+        debug: bool = False,
+        max_active_jobs: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        normalized_tickers = [str(ticker).strip() for ticker in tickers if str(ticker).strip()]
+        job_id = f"job-{uuid.uuid4().hex[:12]}"
+        created_at = _utc_now_iso()
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            if max_active_jobs is not None:
+                row = connection.execute(
+                    "SELECT COUNT(*) AS count FROM batch_jobs WHERE status IN ('queued', 'running')"
+                ).fetchone()
+                if int(row["count"] if row else 0) >= max_active_jobs:
+                    connection.rollback()
+                    raise ValueError("too many active batch jobs")
+            connection.execute(
+                """
+                INSERT INTO batch_jobs (
+                    job_id, status, tickers_json, trade_date,
+                    use_hermes_codex_auth, debug, created_at
+                ) VALUES (?, 'queued', ?, ?, ?, ?, ?)
+                """,
+                (
+                    job_id,
+                    json.dumps(normalized_tickers, ensure_ascii=False),
+                    trade_date,
+                    int(use_hermes_codex_auth),
+                    int(debug),
+                    created_at,
+                ),
+            )
+            connection.commit()
+        job = self.get_batch_job(job_id)
+        if job is None:  # pragma: no cover - defensive
+            raise RuntimeError(f"Failed to create batch job: {job_id}")
+        return job
+
+    def mark_batch_job_running(self, job_id: str) -> bool:
+        with self._connect() as connection:
+            cursor = connection.execute(
+                "UPDATE batch_jobs SET status = 'running', started_at = ? WHERE job_id = ? AND status = 'queued'",
+                (_utc_now_iso(), job_id),
+            )
+            connection.commit()
+        return cursor.rowcount > 0
+
+    def mark_batch_job_completed(self, job_id: str, summary: Dict[str, Any]) -> bool:
+        sanitized_summary = self._sanitize_batch_summary(summary)
+        failed = sanitized_summary.get("failed", []) or []
+        run_ids = sanitized_summary.get("run_ids", []) or []
+        with self._connect() as connection:
+            cursor = connection.execute(
+                """
+                UPDATE batch_jobs
+                SET status = 'completed', finished_at = ?, completed = ?,
+                    failed_count = ?, run_ids_json = ?, summary_json = ?, error = ''
+                WHERE job_id = ? AND status = 'running'
+                """,
+                (
+                    _utc_now_iso(),
+                    int(sanitized_summary.get("completed", 0) or 0),
+                    len(failed),
+                    json.dumps(run_ids, ensure_ascii=False),
+                    json.dumps(sanitized_summary, ensure_ascii=False),
+                    job_id,
+                ),
+            )
+            connection.commit()
+        return cursor.rowcount > 0
+
+    def mark_batch_job_failed(self, job_id: str, error: str) -> bool:
+        with self._connect() as connection:
+            cursor = connection.execute(
+                """
+                UPDATE batch_jobs
+                SET status = 'failed', finished_at = ?, error = ?, failed_count = 1
+                WHERE job_id = ? AND status IN ('queued', 'running')
+                """,
+                (_utc_now_iso(), error, job_id),
+            )
+            connection.commit()
+        return cursor.rowcount > 0
+
+    def count_active_batch_jobs(self) -> int:
+        with self._connect() as connection:
+            row = connection.execute(
+                "SELECT COUNT(*) AS count FROM batch_jobs WHERE status IN ('queued', 'running')"
+            ).fetchone()
+        return int(row["count"] if row else 0)
+
+    def recover_interrupted_batch_jobs(self) -> int:
+        with self._connect() as connection:
+            cursor = connection.execute(
+                """
+                UPDATE batch_jobs
+                SET status = 'failed', finished_at = ?, error = 'interrupted by dashboard restart', failed_count = 1
+                WHERE status IN ('queued', 'running')
+                """,
+                (_utc_now_iso(),),
+            )
+            connection.commit()
+        return cursor.rowcount
+
+    def get_batch_job(self, job_id: str) -> Optional[Dict[str, Any]]:
+        with self._connect() as connection:
+            row = connection.execute("SELECT * FROM batch_jobs WHERE job_id = ?", (job_id,)).fetchone()
+        return self._coerce_batch_job_row(row) if row else None
+
+    def list_batch_jobs(self, *, limit: int = 20, offset: int = 0) -> List[Dict[str, Any]]:
+        with self._connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT * FROM batch_jobs
+                ORDER BY created_at DESC, job_id DESC
+                LIMIT ? OFFSET ?
+                """,
+                (max(0, limit), max(0, offset)),
+            ).fetchall()
+        return [self._coerce_batch_job_row(row) for row in rows]
+
+    @staticmethod
+    def _sanitize_batch_summary(summary: Dict[str, Any]) -> Dict[str, Any]:
+        sanitized = dict(summary or {})
+        failed_items = []
+        for item in sanitized.get("failed", []) or []:
+            if isinstance(item, dict):
+                clean_item = {key: value for key, value in item.items() if key.lower() != "traceback"}
+                failed_items.append(clean_item)
+            else:
+                failed_items.append(item)
+        if "failed" in sanitized:
+            sanitized["failed"] = failed_items
+        return sanitized
+
+    @staticmethod
+    def _coerce_batch_job_row(row: sqlite3.Row) -> Dict[str, Any]:
+        data = dict(row)
+        data["tickers"] = json.loads(data.pop("tickers_json") or "[]")
+        data["run_ids"] = json.loads(data.pop("run_ids_json") or "[]")
+        data["summary"] = json.loads(data.pop("summary_json") or "{}")
+        data["use_hermes_codex_auth"] = bool(data["use_hermes_codex_auth"])
+        data["debug"] = bool(data["debug"])
+        return data
 
     def doctor(self) -> Dict[str, Any]:
         with self._connect() as connection:
