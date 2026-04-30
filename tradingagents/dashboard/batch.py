@@ -32,7 +32,7 @@ def build_batch_config(base_dir: str | Path, *, use_hermes_codex_auth: bool = Fa
     config["max_debate_rounds"] = 1
     config["max_risk_discuss_rounds"] = 1
     config["quick_think_llm"] = "gpt-5.4-mini"
-    config["deep_think_llm"] = "gpt-5.4-mini"
+    config["deep_think_llm"] = "gpt-5.5"
     config["data_vendors"] = {
         "core_stock_apis": "yfinance",
         "technical_indicators": "yfinance",

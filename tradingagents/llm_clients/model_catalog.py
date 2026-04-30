@@ -17,6 +17,7 @@ MODEL_OPTIONS: ProviderModeOptions = {
             ("GPT-4.1 - Smartest non-reasoning model", "gpt-4.1"),
         ],
         "deep": [
+            ("GPT-5.5 - Strongest reasoning frontier", "gpt-5.5"),
             ("GPT-5.4 - Latest frontier, 1M context", "gpt-5.4"),
             ("GPT-5.2 - Strong reasoning, cost-effective", "gpt-5.2"),
             ("GPT-5.4 Mini - Fast, strong coding and tool use", "gpt-5.4-mini"),
