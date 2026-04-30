@@ -53,3 +53,19 @@ def test_run_batch_analysis_collects_failures(tmp_path, sample_final_state):
     assert summary["completed"] == 1
     assert len(summary["failed"]) == 1
     assert summary["failed"][0]["ticker"] == "AAPL"
+
+
+@pytest.mark.unit
+def test_run_batch_analysis_normalizes_korean_tickers(tmp_path, sample_final_state):
+    mock_graph = MagicMock()
+    mock_graph.propagate.return_value = (dict(sample_final_state, company_of_interest="005930.KS"), "Hold")
+
+    with patch("tradingagents.dashboard.batch.TradingAgentsGraph", return_value=mock_graph):
+        summary = run_batch_analysis(
+            ["005930"],
+            "2024-05-10",
+            artifact_dir=tmp_path,
+        )
+
+    assert summary["tickers"] == ["005930.KS"]
+    mock_graph.propagate.assert_called_once_with("005930.KS", "2024-05-10")

@@ -535,6 +535,23 @@ class TestDeferredReflection:
         assert raw is not None and alpha is not None and days is not None
         assert days == 2
 
+    def test_fetch_returns_uses_kospi_benchmark_for_korean_tickers(self):
+        stock_prices = [100.0, 101.0, 102.0, 103.0, 104.0, 105.0]
+        kospi_prices = [200.0, 201.0, 202.0, 203.0, 204.0, 205.0]
+        seen_symbols = []
+        mock_graph = MagicMock(spec=TradingAgentsGraph)
+        with patch("yfinance.Ticker") as mock_ticker_cls:
+            def _make_ticker(sym):
+                seen_symbols.append(sym)
+                m = MagicMock()
+                m.history.return_value = _price_df(kospi_prices if sym == "^KS11" else stock_prices)
+                return m
+            mock_ticker_cls.side_effect = _make_ticker
+            raw, alpha, days = TradingAgentsGraph._fetch_returns(mock_graph, "005930.KS", "2026-01-05")
+        assert raw is not None and alpha is not None and days is not None
+        assert "^KS11" in seen_symbols
+        assert "SPY" not in seen_symbols
+
     # TradingAgentsGraph._resolve_pending_entries
 
     def test_resolve_skips_other_tickers(self, tmp_path):

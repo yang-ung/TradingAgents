@@ -8,6 +8,7 @@ from typing import Iterable, List, Optional
 
 from tradingagents.default_config import DEFAULT_CONFIG
 from tradingagents.graph.trading_graph import TradingAgentsGraph
+from tradingagents.ticker_utils import normalize_ticker_symbol
 
 from .extract import build_analysis_record, utc_now_iso
 from .models import BatchSummary
@@ -50,7 +51,7 @@ def run_batch_analysis(
     use_hermes_codex_auth: bool = False,
     debug: bool = False,
 ) -> BatchSummary:
-    tickers = [ticker.upper() for ticker in tickers]
+    tickers = [normalize_ticker_symbol(ticker) for ticker in tickers]
     artifact_dir = Path(artifact_dir)
     artifact_dir.mkdir(parents=True, exist_ok=True)
     repository = AnalysisRepository(artifact_dir)
