@@ -43,7 +43,7 @@
           <dl class="metric-list">
             <div><dt>트레이더 액션</dt><dd>{{ record.trader_action }}</dd></div>
             <div><dt>리서치 의견</dt><dd>{{ record.research_recommendation }}</dd></div>
-            <div><dt>목표가</dt><dd>{% if record.price_target %}{{ "%.2f"|format(record.price_target) }}{% else %}-{% endif %}</dd></div>
+            <div><dt>목표가</dt><dd>{% if record.price_target %}{{ record.price_target|money(chart.currency) }}{% else %}-{% endif %}</dd></div>
             <div><dt>투자 기간</dt><dd>{{ record.time_horizon or '-' }}</dd></div>
             <div><dt>모델</dt><dd>{{ record.metadata.quick_think_llm or '-' }} / {{ record.metadata.deep_think_llm or '-' }}</dd></div>
           </dl>
@@ -55,13 +55,12 @@
           <div>
             <p class="eyebrow">가격 흐름</p>
             <h2>가격 차트</h2>
-            <p>캔들, 거래량, 주요 이동평균을 한 화면에서 확인합니다.</p>
           </div>
           {% if chart.available %}
           <div class="price-ticker {{ 'positive' if chart.positive else 'negative' }}">
             <span>{{ chart.currency or '' }}</span>
-            <strong>{{ "%.2f"|format(chart.latest_close) }}</strong>
-            <em>{% if chart.change >= 0 %}+{% endif %}{{ "%.2f"|format(chart.change) }} / {% if chart.change_percent >= 0 %}+{% endif %}{{ "%.2f"|format(chart.change_percent) }}%</em>
+            <strong>{{ chart.latest_close|money(chart.currency) }}</strong>
+            <em>{% if chart.change >= 0 %}+{% endif %}{{ chart.change|money(chart.currency) }} / {% if chart.change_percent >= 0 %}+{% endif %}{{ "%.2f"|format(chart.change_percent) }}%</em>
           </div>
           {% endif %}
         </div>
@@ -93,8 +92,8 @@
           <dl class="chart-stats">
             <div><dt>기간 시작</dt><dd>{{ chart.start_date }}</dd></div>
             <div><dt>기간 종료</dt><dd>{{ chart.end_date }}</dd></div>
-            <div><dt>고가</dt><dd>{{ "%.2f"|format(chart.max_close) }}</dd></div>
-            <div><dt>저가</dt><dd>{{ "%.2f"|format(chart.min_close) }}</dd></div>
+            <div><dt>고가</dt><dd>{{ chart.max_close|money(chart.currency) }}</dd></div>
+            <div><dt>저가</dt><dd>{{ chart.min_close|money(chart.currency) }}</dd></div>
           </dl>
         </div>
         <script id="chart-payload" type="application/json">{{ chart|tojson }}</script>
@@ -106,6 +105,122 @@
           <p>{{ chart.reason or '일시적인 데이터 소스 문제일 수 있습니다.' }}</p>
         </div>
         {% endif %}
+      </section>
+
+      <section class="panel backtest-panel" id="backtest">
+        <div class="panel-header split">
+          <div>
+            <p class="eyebrow">과거 적용 시뮬레이션</p>
+            <h2>백테스트 시뮬레이션</h2>
+          </div>
+          {% if backtest.available %}
+          <span class="pill tone-info">표본 {{ backtest.summary.trade_count }}회 · 승률 {{ "%.2f"|format(backtest.summary.win_rate_percent) }}%</span>
+          {% endif %}
+        </div>
+        {% if backtest.available %}
+        <div class="backtest-levels" aria-label="백테스트 적용 가격">
+          <div><span>진입 구간</span><strong>{{ backtest.levels.entry_low|money(backtest.levels.currency) }} ~ {{ backtest.levels.entry_high|money(backtest.levels.currency) }}</strong></div>
+          <div><span>익절</span><strong>{{ backtest.levels.take_profit|money(backtest.levels.currency) }}</strong></div>
+          <div><span>손절</span><strong>{{ backtest.levels.stop_loss|money(backtest.levels.currency) }}</strong></div>
+          <div><span>성과 상위 구간</span><strong>{{ backtest.summary.best_period }}</strong></div>
+        </div>
+        <div class="backtest-table-wrap">
+          <table class="backtest-table">
+            <thead>
+              <tr><th>기간</th><th>전략 수익률</th><th>벤치마크</th><th>초과수익</th><th>거래</th><th>승률</th></tr>
+            </thead>
+            <tbody>
+              {% for label, period in backtest.periods.items() %}
+              <tr>
+                <td>{{ label }}<small>{{ period.start_date }} ~ {{ period.end_date }}</small></td>
+                <td class="{{ 'positive' if period.strategy_return_percent >= 0 else 'negative' }}">{% if period.strategy_return_percent >= 0 %}+{% endif %}{{ "%.2f"|format(period.strategy_return_percent) }}%</td>
+                <td class="{{ 'positive' if period.benchmark_return_percent >= 0 else 'negative' }}">{% if period.benchmark_return_percent >= 0 %}+{% endif %}{{ "%.2f"|format(period.benchmark_return_percent) }}%</td>
+                <td class="{{ 'positive' if period.excess_return_percent >= 0 else 'negative' }}">{% if period.excess_return_percent >= 0 %}+{% endif %}{{ "%.2f"|format(period.excess_return_percent) }}%</td>
+                <td>{{ period.trade_count }}회</td>
+                <td>{{ "%.2f"|format(period.win_rate_percent) }}%</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% set whole = backtest.periods.get('전체') %}
+        {% if whole and whole.trades %}
+        <div class="trade-log">
+          <h3>최근 거래 로그</h3>
+          <ul>
+            {% for trade in whole.trades[:5] %}
+            <li>
+              <span>{{ trade.entry_date }} {{ trade.entry_price|money(backtest.levels.currency) }} 진입 → {{ trade.exit_date }} {{ trade.exit_price|money(backtest.levels.currency) }} 청산</span>
+              <strong class="{{ 'positive' if trade.return_percent >= 0 else 'negative' }}">{% if trade.return_percent >= 0 %}+{% endif %}{{ "%.2f"|format(trade.return_percent) }}%</strong>
+              <em>시뮬레이션 기준 · {% if trade.exit_reason == 'take_profit' %}익절 도달{% elif trade.exit_reason == 'stop_loss' %}손절 도달{% else %}기간 종료{% endif %}</em>
+            </li>
+            {% endfor %}
+          </ul>
+        </div>
+        {% endif %}
+        <p class="backtest-disclaimer">이 결과는 현재 리포트에서 추출한 진입·익절·손절 규칙을 과거 가격 데이터에 단순 적용한 시뮬레이션입니다. 사전 검증/out-of-sample 성과가 아니며, 수수료·세금·슬리피지·분할체결·일봉 내부 체결 순서는 반영하지 않습니다. 미래 수익을 보장하지 않습니다.</p>
+        {% else %}
+        <div class="empty-state">
+          <strong>백테스트를 계산할 수 없습니다.</strong>
+          <p>{% if backtest.reason == 'price_timing_levels_unavailable' %}진입·익절·손절 가격이 구조적으로 확인되어야 수익률 검증을 표시합니다.{% elif backtest.reason == 'chart_unavailable' %}가격 차트 데이터가 없어 전략 수익률을 계산할 수 없습니다.{% else %}충분한 가격 이력이 필요합니다.{% endif %}</p>
+        </div>
+        {% endif %}
+      </section>
+
+      {% if structured_verified %}
+      <section class="panel structured-status verified">
+        <span>검증된 구조화 리포트</span>
+        <strong>점수 {{ "%.2f"|format(structured_verification.score) }}</strong>
+      </section>
+
+      <section class="structured-card-grid" aria-label="핵심 투자 판단 카드">
+        {% for card in structured_report.decision_cards %}
+        <article class="panel structured-card" data-tone="{{ card.tone }}">
+          <p class="eyebrow">{{ card.title }}</p>
+          <h2>{{ card.value }}</h2>
+          <p>{{ card.description }}</p>
+        </article>
+        {% endfor %}
+      </section>
+
+      <section class="panel structured-summary" id="reports">
+        <div class="panel-header split">
+          <div>
+            <p class="eyebrow">핵심 판단</p>
+            <h2>{{ structured_report.executive_summary.headline }}</h2>
+          </div>
+          <span class="pill tone-{{ structured_report.executive_summary.tone }}">{{ structured_report.executive_summary.rating }} · {{ structured_report.executive_summary.trader_action }}</span>
+        </div>
+      </section>
+
+      <section class="structured-factor-layout">
+        <article class="panel factor-panel">
+          <div class="panel-header"><div><p class="eyebrow">핵심 근거</p><h2>긍정 근거</h2></div></div>
+          <ul class="factor-list">
+            {% for factor in structured_report.positive_factors %}
+            <li data-tone="{{ factor.tone }}"><span>{{ factor.text }}</span>{% if factor.source_labels %}<em>근거: {{ factor.source_labels|join(', ') }}</em>{% endif %}</li>
+            {% endfor %}
+          </ul>
+        </article>
+        <article class="panel factor-panel">
+          <div class="panel-header"><div><p class="eyebrow">리스크</p><h2>주의 요인</h2></div></div>
+          <ul class="factor-list">
+            {% for factor in structured_report.risk_factors %}
+            <li data-tone="{{ factor.tone }}"><span>{{ factor.text }}</span>{% if factor.source_labels %}<em>근거: {{ factor.source_labels|join(', ') }}</em>{% endif %}</li>
+            {% endfor %}
+          </ul>
+        </article>
+      </section>
+
+      <section class="panel action-strategy" data-tone="{{ structured_report.action_strategy.tone }}">
+        <div class="panel-header"><div><p class="eyebrow">실행 전략</p><h2>{{ structured_report.action_strategy.title }}</h2></div></div>
+        <p>{{ structured_report.action_strategy.text }}</p>
+        <small>{% if structured_report.action_strategy.source_labels %}근거: {{ structured_report.action_strategy.source_labels|join(', ') }}{% endif %}</small>
+      </section>
+      {% else %}
+      <section class="panel structured-status failed">
+        <span>원문 리포트 기반 보기</span>
+        <strong>구조화 검증 실패{% if structured_verification.score is defined %} · 점수 {{ "%.2f"|format(structured_verification.score) }}{% endif %}</strong>
       </section>
 
       <section class="insight-grid">
@@ -120,37 +235,35 @@
           <p>{{ record.investment_thesis or record.reports.final_trade_decision }}</p>
         </article>
       </section>
+      {% endif %}
 
-      <section class="panel compact-navigator">
-        <div class="panel-header">
+      <section class="panel agent-analysis" id="reports">
+        <div class="panel-header split">
           <div>
             <p class="eyebrow">상세 근거</p>
-            <h2>필요한 섹션만 빠르게 확인</h2>
-            <p>분석 근거를 시장, 뉴스/공시, 펀더멘털, 최종 결정 순서로 정리했습니다.</p>
+            <h2>에이전트별 분석</h2>
           </div>
+          <nav class="toc compact">
+            {% for section in agent_sections %}
+              <a href="#agent-{{ section.id }}">{{ section.title }}</a>
+            {% endfor %}
+          </nav>
         </div>
-        <nav class="toc">
-          {% for key, title in sections %}
-            {% if record.reports.get(key) %}<a href="#{{ key }}">{{ title }}</a>{% endif %}
+        <div class="agent-section-grid">
+          {% for section in agent_sections %}
+          <article id="agent-{{ section.id }}" class="agent-section-card" data-section="{{ section.id }}">
+            <div class="agent-section-summary">
+              <h3>{{ section.title }}</h3>
+              <p>{{ section.summary }}</p>
+            </div>
+            <details class="agent-detail">
+              <summary><span>상세보기</span></summary>
+              <article class="report-body">{{ section.detail }}</article>
+            </details>
+          </article>
           {% endfor %}
-        </nav>
+        </div>
       </section>
-
-      <section id="reports" class="panel final-decision-card">
-        <div class="panel-header"><div><p class="eyebrow">핵심 판단</p><h2>최종 포트폴리오 결정</h2></div></div>
-        <article class="report-body">{{ record.reports.final_trade_decision }}</article>
-      </section>
-
-      {% for key, title in sections %}
-        {% if record.reports.get(key) and key != 'final_trade_decision' %}
-        <section id="{{ key }}" class="panel report-section" data-section="{{ key }}">
-          <details open>
-            <summary><h2>{{ title }}</h2><span>보기</span></summary>
-            <article class="report-body">{{ record.reports.get(key) }}</article>
-          </details>
-        </section>
-        {% endif %}
-      {% endfor %}
     </main>
   </body>
 </html>

@@ -13,6 +13,7 @@ TICKER_INPUT_EXAMPLES = "Examples: SPY, 005930, 035720.KQ, CNC.TO, 7203.T, 0700.
 
 ANALYST_ORDER = [
     ("Market Analyst", AnalystType.MARKET),
+    ("Quant Strategy Analyst", AnalystType.QUANT),
     ("Social Media Analyst", AnalystType.SOCIAL),
     ("News Analyst", AnalystType.NEWS),
     ("Fundamentals Analyst", AnalystType.FUNDAMENTALS),

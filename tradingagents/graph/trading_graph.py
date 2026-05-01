@@ -53,7 +53,7 @@ class TradingAgentsGraph:
 
     def __init__(
         self,
-        selected_analysts=["market", "social", "news", "fundamentals"],
+        selected_analysts=["market", "quant", "social", "news", "fundamentals"],
         debug=False,
         config: Dict[str, Any] = None,
         callbacks: Optional[List] = None,
@@ -168,6 +168,13 @@ class TradingAgentsGraph:
                     # Core stock data tools
                     get_stock_data,
                     # Technical indicators
+                    get_indicators,
+                ]
+            ),
+            "quant": ToolNode(
+                [
+                    # Price data and technical indicators for strategy selection
+                    get_stock_data,
                     get_indicators,
                 ]
             ),
@@ -363,6 +370,7 @@ class TradingAgentsGraph:
             "company_of_interest": final_state["company_of_interest"],
             "trade_date": final_state["trade_date"],
             "market_report": final_state["market_report"],
+            "quant_strategy_report": final_state.get("quant_strategy_report", ""),
             "sentiment_report": final_state["sentiment_report"],
             "news_report": final_state["news_report"],
             "fundamentals_report": final_state["fundamentals_report"],

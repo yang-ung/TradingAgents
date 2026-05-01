@@ -157,17 +157,17 @@ def test_dashboard_detail_renders_premium_stock_workspace_with_chart(tmp_path, s
             "ticker": ticker,
             "currency": "KRW",
             "points": [
-                {"date": "2026-04-24", "close": 100.0, "volume": 1000},
-                {"date": "2026-04-25", "close": 108.0, "volume": 1200},
+                {"date": "2026-04-24", "close": 330000.9, "volume": 1000},
+                {"date": "2026-04-25", "close": 333000.7, "volume": 1200},
             ],
             "path": "M 0 100 L 720 20",
             "area_path": "M 0 100 L 720 20 L 720 220 L 0 220 Z",
-            "latest_close": 108.0,
-            "first_close": 100.0,
-            "change": 8.0,
-            "change_percent": 8.0,
-            "min_close": 100.0,
-            "max_close": 108.0,
+            "latest_close": 333000.7,
+            "first_close": 330000.9,
+            "change": 2999.8,
+            "change_percent": 0.91,
+            "min_close": 330000.9,
+            "max_close": 333000.7,
             "start_date": "2026-04-24",
             "end_date": "2026-04-25",
         }
@@ -193,12 +193,33 @@ def test_dashboard_detail_renders_premium_stock_workspace_with_chart(tmp_path, s
     assert "핵심 판단" in response.text
     assert "핵심 근거" in response.text
     assert "상세 근거" in response.text
-    assert "108.00" in response.text
-    assert "+8.00%" in response.text
+    assert "에이전트별 분석" in response.text
+    assert "시장 분석" in response.text
+    assert "퀀트 전략 분석" in response.text
+    assert "Suggested entry 330,000-333,000" in response.text
+    assert "Bull case: growth and margins remain elite." in response.text
+    assert "Bear case: valuation leaves little room for disappointment." in response.text
+    assert "Aggressive analyst: add on recovery." in response.text
+    assert "Conservative analyst: do not chase valuation." in response.text
+    assert "Neutral analyst: maintain current weight." in response.text
+    assert "상세보기" in response.text
+    assert '<details class="agent-detail">' in response.text
+    assert '<details open' not in response.text
+    assert "<p>**Recommendation**" not in response.text
+    assert "<p>**Action**" not in response.text
+    assert "FINAL TRANSACTION PROPOSAL" in response.text
+    assert "333,000" in response.text
+    assert "330,000" in response.text
+    assert "+2,999" in response.text
+    assert "333000.70" not in response.text
+    assert "+0.91%" in response.text
     assert "M 0 100 L 720 20" in response.text
     assert "전문 트레이딩 차트" not in response.text
     assert "Professional Market Context" not in response.text
     assert "Lightweight Charts · Apache-2.0" not in response.text
+    assert "원문을 보존한 상태에서 읽기 좋게 재구성" not in response.text
+    assert "각 섹션은 요약된 핵심 bullet" not in response.text
+    assert "필요한 섹션만 빠르게 확인" not in response.text
     assert not re.search(r">\d+자<", response.text)
 
 

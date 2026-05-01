@@ -314,7 +314,7 @@ class AnalysisRepository:
             structured_path, raw_log_path, payload_path, market, exchange,
             quick_think_llm, deep_think_llm, elapsed_seconds,
             has_korean_news, has_dart_disclosures, report_version, archived,
-            updated_at
+            updated_at, payload_json
         """
 
     def list_runs(
@@ -377,6 +377,16 @@ class AnalysisRepository:
     @staticmethod
     def _coerce_row(row: sqlite3.Row) -> Dict[str, Any]:
         data = dict(row)
+        payload_json = data.pop("payload_json", "")
+        if payload_json:
+            try:
+                payload = json.loads(payload_json)
+                verification = payload.get("structured_report_verification") or {}
+                data["structured_report_verified"] = bool(
+                    payload.get("structured_report_verified") and verification.get("status") == "pass"
+                )
+            except json.JSONDecodeError:
+                data["structured_report_verified"] = False
         for key in ("has_korean_news", "has_dart_disclosures", "archived"):
             if key in data:
                 data[key] = bool(data[key])

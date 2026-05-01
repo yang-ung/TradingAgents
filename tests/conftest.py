@@ -52,6 +52,11 @@ def sample_final_state():
         "company_of_interest": "NVDA",
         "trade_date": "2024-05-10",
         "market_report": "FINAL TRANSACTION PROPOSAL: **BUY**\nMomentum recovered and trend structure improved.",
+        "quant_strategy_report": (
+            "Quant Strategy Report\n"
+            "Preferred strategy: buy pullbacks near 330,000, avoid chasing above resistance.\n"
+            "Suggested entry 330,000-333,000, first take-profit 360,000, stop-loss 318,000."
+        ),
         "sentiment_report": "FINAL TRANSACTION PROPOSAL: **HOLD**\nNo strong fresh catalyst from social/news sources.",
         "news_report": "# NVDA Weekly Macro & Trading News Report\nAI enthusiasm remains intact but valuation scrutiny is rising.",
         "fundamentals_report": "# NVDA Fundamental Report\nMargins and free cash flow remain exceptional.",

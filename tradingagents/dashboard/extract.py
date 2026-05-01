@@ -103,6 +103,7 @@ def _make_run_id(ticker: str, trade_date: str, generated_at: str) -> str:
 def _build_reports(final_state: Dict[str, Any]) -> Dict[str, str]:
     return {
         "market_report": sanitize_generated_text(final_state.get("market_report", "")),
+        "quant_strategy_report": sanitize_generated_text(final_state.get("quant_strategy_report", "")),
         "sentiment_report": sanitize_generated_text(final_state.get("sentiment_report", "")),
         "news_report": sanitize_generated_text(final_state.get("news_report", "")),
         "fundamentals_report": sanitize_generated_text(final_state.get("fundamentals_report", "")),
@@ -180,7 +181,36 @@ def build_analysis_record(
         "metadata": metadata or {},
         "raw_state": _json_safe(final_state),
     }
+    _attach_strategy_spec(record)
+    from .reporting import structure_and_verify_report
+
+    record.update(structure_and_verify_report(record))
     return record
+
+
+def _attach_strategy_spec(record: Dict[str, Any]) -> None:
+    try:
+        from .backtest import extract_price_timing_levels
+        from tradingagents.strategies import StrategySpec, extract_strategy_spec_from_text
+
+        reports = record.get("reports") if isinstance(record.get("reports"), dict) else {}
+        direct_spec = extract_strategy_spec_from_text(str(reports.get("quant_strategy_report") or ""))
+        if direct_spec is not None:
+            record["strategy_spec"] = direct_spec.model_dump()
+            return
+
+        levels = extract_price_timing_levels(record)
+        if levels is None:
+            return
+        spec = StrategySpec.from_price_timing_levels(
+            ticker=record.get("ticker", ""),
+            trade_date=record.get("trade_date", ""),
+            levels=levels,
+            source="quant_strategy_report",
+        )
+        record["strategy_spec"] = spec.model_dump()
+    except Exception:
+        return
 
 
 def dump_record(record: AnalysisRecord) -> str:

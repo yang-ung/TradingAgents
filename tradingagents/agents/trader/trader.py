@@ -24,6 +24,7 @@ def create_trader(llm):
         company_name = state["company_of_interest"]
         instrument_context = build_instrument_context(company_name)
         investment_plan = state["investment_plan"]
+        quant_strategy_report = state.get("quant_strategy_report", "")
 
         messages = [
             {
@@ -31,7 +32,8 @@ def create_trader(llm):
                 "content": (
                     "You are a trading agent analyzing market data to make investment decisions. "
                     "Based on your analysis, provide a specific recommendation to buy, sell, or hold. "
-                    "Anchor your reasoning in the analysts' reports and the research plan."
+                    "When possible, translate the plan into actionable price timing: entry zone, add-on zone, take-profit/trim levels, stop-loss or invalidation, and when not to trade. "
+                    "Anchor your reasoning in the analysts' reports, the quant strategy report, and the research plan."
                     f"{get_language_instruction()}"
                 ),
             },
@@ -43,6 +45,7 @@ def create_trader(llm):
                     f"insights from current technical market trends, macroeconomic indicators, and "
                     f"social media sentiment. Use this plan as a foundation for evaluating your next "
                     f"trading decision.\n\nProposed Investment Plan: {investment_plan}\n\n"
+                    f"Quant Strategy Report: {quant_strategy_report}\n\n"
                     f"Leverage these insights to make an informed and strategic decision."
                 ),
             },

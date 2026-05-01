@@ -27,13 +27,14 @@ class GraphSetup:
         self.conditional_logic = conditional_logic
 
     def setup_graph(
-        self, selected_analysts=["market", "social", "news", "fundamentals"]
+        self, selected_analysts=["market", "quant", "social", "news", "fundamentals"]
     ):
         """Set up and compile the agent workflow graph.
 
         Args:
             selected_analysts (list): List of analyst types to include. Options are:
                 - "market": Market analyst
+                - "quant": Quant strategy analyst
                 - "social": Social media analyst
                 - "news": News analyst
                 - "fundamentals": Fundamentals analyst
@@ -52,6 +53,13 @@ class GraphSetup:
             )
             delete_nodes["market"] = create_msg_delete()
             tool_nodes["market"] = self.tool_nodes["market"]
+
+        if "quant" in selected_analysts:
+            analyst_nodes["quant"] = create_quant_strategy_analyst(
+                self.quick_thinking_llm
+            )
+            delete_nodes["quant"] = create_msg_delete()
+            tool_nodes["quant"] = self.tool_nodes["quant"]
 
         if "social" in selected_analysts:
             analyst_nodes["social"] = create_social_media_analyst(

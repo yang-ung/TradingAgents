@@ -126,7 +126,11 @@ class TraderProposal(BaseModel):
     )
     entry_price: Optional[float] = Field(
         default=None,
-        description="Optional entry price target in the instrument's quote currency.",
+        description="Optional entry price target or midpoint of the entry zone in the instrument's quote currency.",
+    )
+    take_profit: Optional[float] = Field(
+        default=None,
+        description="Optional first take-profit or trim price in the instrument's quote currency.",
     )
     stop_loss: Optional[float] = Field(
         default=None,
@@ -152,6 +156,8 @@ def render_trader_proposal(proposal: TraderProposal) -> str:
     ]
     if proposal.entry_price is not None:
         parts.extend(["", f"**Entry Price**: {proposal.entry_price}"])
+    if proposal.take_profit is not None:
+        parts.extend(["", f"**Take Profit**: {proposal.take_profit}"])
     if proposal.stop_loss is not None:
         parts.extend(["", f"**Stop Loss**: {proposal.stop_loss}"])
     if proposal.position_sizing:

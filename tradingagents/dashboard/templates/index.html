@@ -3,37 +3,136 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>TradingAgents 하이브리드 대시보드</title>
+    <title>TradingAgents 투자 리서치 운영센터</title>
     <style>
-      html { background: #0b1020; }
-      body { margin: 0; min-height: 100vh; background: linear-gradient(180deg, #0b1020 0%, #0f172a 100%); color: #e8ecf8; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif; }
-      .page { max-width: 1480px; margin: 0 auto; padding: 32px 24px 80px; }
+      html { background: #07070b; }
+      body { margin: 0; min-height: 100vh; background: #07070b; color: #f7f8ff; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif; }
+      .page { max-width: 1520px; margin: 0 auto; padding: 28px 24px 88px; }
     </style>
     <link rel="stylesheet" href="{{ url_for('static', path='/dashboard.css') }}" />
   </head>
   <body>
-    <main class="page">
-      <header class="hero">
-        <div>
-          <p class="eyebrow">TradingAgents Dashboard</p>
-          <h1>분석 결과 운영 대시보드</h1>
-          <p class="lede">종목별 최신 판단, 실행 히스토리, 한국 뉴스/공시 포함 여부를 한 화면에서 관리합니다.</p>
+    <main class="page service-dashboard">
+      <header class="service-hero">
+        <div class="service-hero-main">
+          <div class="topline">
+            <span class="brand-mark">TA</span>
+            <span>TradingAgents Intelligence</span>
+          </div>
+          <p class="eyebrow">핵심 정보</p>
+          <h1>오늘의 투자 판단</h1>
+          <div class="hero-facts" aria-label="핵심 정보 요약">
+            <div><span>검증 리포트</span><strong>{{ dashboard_metrics.verified_ratio }}%</strong></div>
+            <div><span>분석 종목</span><strong>{{ dashboard_metrics.visible_runs }}</strong></div>
+            <div><span>최근 업데이트</span><strong>{{ dashboard_metrics.latest_updated_label }}</strong></div>
+          </div>
+          <div class="hero-actions">
+            <a class="link-button" href="#runs">분석 목록 보기</a>
+            <a class="link-button secondary" href="#batch">새 배치 실행</a>
+            <a class="link-button ghost" href="/management">DB 관리</a>
+          </div>
         </div>
-        <dl class="meta-card">
-          <div><dt>데이터셋</dt><dd>{{ data_dir }}</dd></div>
-          <div><dt>조회 결과</dt><dd>{{ total }}건</dd></div>
-          <div><dt>최근 갱신</dt><dd>{{ latest_generated_at or '아직 실행 기록이 없습니다' }}</dd></div>
-          <div><dt>DB 상태</dt><dd>{{ health.database_rows }} rows / {{ health.payload_files }} files</dd></div>
-        </dl>
+        <aside class="service-status-card" aria-label="서비스 상태">
+          <div class="status-header">
+            <span class="live-dot"></span>
+            <span>서비스 상태</span>
+          </div>
+          <dl class="service-status-grid">
+            <div><dt>DB</dt><dd>{{ dashboard_metrics.db_rows }} rows</dd></div>
+            <div><dt>Payload</dt><dd>{{ dashboard_metrics.payload_files }} files</dd></div>
+            <div><dt>Active jobs</dt><dd>{{ dashboard_metrics.active_jobs }}</dd></div>
+            <div><dt>최근 갱신</dt><dd>{{ dashboard_metrics.latest_updated_label }}</dd></div>
+          </dl>
+          <p class="muted-left">데이터셋: {{ data_dir }}</p>
+        </aside>
       </header>
 
-      <section class="panel">
+      <section class="kpi-grid" aria-label="운영 KPI">
+        <article class="kpi-card accent-purple">
+          <span class="kpi-label">전체 분석</span>
+          <strong>{{ dashboard_metrics.total_runs }}</strong>
+          <p>현재 필터 기준 {{ dashboard_metrics.visible_runs }}건 표시</p>
+        </article>
+        <article class="kpi-card accent-green">
+          <span class="kpi-label">검증 리포트</span>
+          <strong>{{ dashboard_metrics.verified_ratio }}%</strong>
+          <p>{{ dashboard_metrics.verified_count }}건이 구조화 검증 통과</p>
+        </article>
+        <article class="kpi-card accent-blue">
+          <span class="kpi-label">한국 시장</span>
+          <strong>{{ dashboard_metrics.kr_runs }}</strong>
+          <p>KOSPI/KOSDAQ/KRX 분석 커버리지</p>
+        </article>
+        <article class="kpi-card accent-amber">
+          <span class="kpi-label">최근 업데이트</span>
+          <strong>{{ dashboard_metrics.latest_updated_label }}</strong>
+          <p>최신 분석 생성 시각</p>
+        </article>
+      </section>
+
+      <section class="insight-grid" aria-label="오늘의 투자 판단과 운영 인사이트">
+        <article class="panel premium-panel market-overview">
+          <div class="panel-header split">
+            <div>
+              <p class="eyebrow">Decision Snapshot</p>
+              <h2>오늘의 투자 판단</h2>
+              <p>상단에는 최신 결론을 빠르게 훑고, 상세 보기에서 검증된 구조화 리포트를 확인합니다.</p>
+            </div>
+          </div>
+          <div class="decision-strip">
+            {% for rating, count in dashboard_metrics.rating_counts.items() %}
+            <div class="decision-chip">
+              <span class="pill pill-{{ rating|lower }}">{{ rating }}</span>
+              <strong>{{ count }}</strong>
+              <span>건</span>
+            </div>
+            {% else %}
+            <div class="empty compact">아직 판단 데이터가 없습니다.</div>
+            {% endfor %}
+          </div>
+          <div class="run-card-list">
+            {% for run in runs[:4] %}
+            <a class="run-card" href="/runs/{{ run.run_id }}">
+              <div>
+                <span class="ticker-symbol">{{ run.display_label }}</span>
+                <span class="pill pill-{{ run.rating|lower }}">{{ run.rating }}</span>
+              </div>
+              <p>{{ run.decision_summary }}</p>
+              <small>{{ run.market }}{% if run.exchange %}/{{ run.exchange }}{% endif %} · {{ run.trade_date }}</small>
+            </a>
+            {% else %}
+            <div class="empty compact">표시할 분석 결과가 없습니다.</div>
+            {% endfor %}
+          </div>
+        </article>
+
+        <article class="panel premium-panel operations-panel">
+          <div class="panel-header split">
+            <div>
+              <p class="eyebrow">Operations</p>
+              <h2>운영 인사이트</h2>
+              <p>데이터 신뢰도, 시장 커버리지, 배치 상태를 운영 관점에서 확인합니다.</p>
+            </div>
+          </div>
+          <dl class="ops-list">
+            <div><dt>검증 커버리지</dt><dd>{{ dashboard_metrics.verified_count }} / {{ dashboard_metrics.visible_runs }}</dd></div>
+            <div><dt>시장 분포</dt><dd>{% for market, count in dashboard_metrics.market_counts.items() %}<span>{{ market }} {{ count }}</span>{% else %}<span>-</span>{% endfor %}</dd></div>
+            <div><dt>실패 Job</dt><dd>{{ dashboard_metrics.failed_jobs }}</dd></div>
+            <div><dt>운영 권장</dt><dd>최신만 필터로 중복 종목을 정리하고, 검증 리포트 비율을 우선 확인하세요.</dd></div>
+          </dl>
+        </article>
+      </section>
+
+      <section class="panel premium-panel filter-panel">
         <div class="panel-header">
-          <h2>필터</h2>
-          <p>티커, 시장, 날짜, 등급으로 저장된 분석 결과를 좁혀볼 수 있습니다.</p>
-          <a class="link-button" href="/management">DB 관리</a>
+          <div>
+            <p class="eyebrow">Command Center</p>
+            <h2>필터</h2>
+            <p>티커, 시장, 날짜, 등급으로 저장된 분석 결과를 좁혀볼 수 있습니다.</p>
+          </div>
+          <a class="link-button secondary" href="/management">DB 관리</a>
         </div>
-        <form class="filter-grid" method="get" action="/">
+        <form class="filter-grid command-grid" method="get" action="/">
           <label>검색어<input name="query" value="{{ filters.query }}" placeholder="티커, run id, 요약" /></label>
           <label>티커<input name="ticker" value="{{ filters.ticker }}" placeholder="예: 005930.KS" /></label>
           <label>시장
@@ -53,27 +152,33 @@
         </form>
       </section>
 
-      <section class="panel">
+      <section id="batch" class="panel premium-panel batch-launcher">
         <div class="panel-header">
-          <h2>새 배치 실행</h2>
-          <p>서버에서 TradingAgents batch를 바로 실행합니다. 긴 작업은 백그라운드 job으로 돌고 아래 실행 상태에서 추적합니다.</p>
+          <div>
+            <p class="eyebrow">Batch Runner</p>
+            <h2>새 배치 실행</h2>
+            <p>서버에서 TradingAgents batch를 바로 실행합니다. 긴 작업은 백그라운드 job으로 돌고 아래 실행 상태에서 추적합니다.</p>
+          </div>
         </div>
-        <form id="batch-form" class="filter-grid">
+        <form id="batch-form" class="filter-grid command-grid">
           <label>종목 입력<input name="tickers" placeholder="005930, 035720, 247540" required /></label>
           <label>기준일<input type="date" name="trade_date" required /></label>
           <label class="checkbox"><input type="checkbox" name="use_hermes_codex_auth" value="1" checked /> Hermes/Codex 인증 사용</label>
           <label class="checkbox"><input type="checkbox" name="debug" value="1" /> 디버그 로그</label>
           <button type="submit">배치 실행</button>
-          <p id="batch-form-status" class="muted"></p>
+          <p id="batch-form-status" class="muted-left"></p>
         </form>
       </section>
 
-      <section class="panel">
+      <section class="panel premium-panel">
         <div class="panel-header">
-          <h2>실행 상태</h2>
-          <p>최근 batch job 상태입니다. 완료된 job의 run id는 상세 화면에서 확인할 수 있습니다.</p>
+          <div>
+            <p class="eyebrow">Job Monitor</p>
+            <h2>실행 상태</h2>
+            <p>최근 batch job 상태입니다. 완료된 job의 run id는 상세 화면에서 확인할 수 있습니다.</p>
+          </div>
         </div>
-        <div class="table-wrap">
+        <div class="table-wrap premium-table">
           <table>
             <thead>
               <tr><th>Job</th><th>상태</th><th>종목</th><th>기준일</th><th>완료/실패</th><th>생성</th><th>오류</th></tr>
@@ -82,7 +187,7 @@
               {% for job in batch_jobs %}
               <tr data-job-id="{{ job.job_id }}">
                 <td class="mono">{{ job.job_id }}</td>
-                <td><span class="pill">{{ job.status }}</span></td>
+                <td><span class="pill status-{{ job.status }}">{{ job.status }}</span></td>
                 <td>{{ job.tickers|join(', ') }}</td>
                 <td>{{ job.trade_date }}</td>
                 <td>{{ job.completed }} / {{ job.failed_count }}</td>
@@ -97,38 +202,42 @@
         </div>
       </section>
 
-      <section class="panel">
+      <section id="runs" class="panel premium-panel">
         <div class="panel-header">
-          <h2>분석 실행 목록</h2>
-          <p>각 행은 저장된 TradingAgents 분석 결과 1건입니다. “종목별 최신만”을 켜면 같은 종목의 최신 run만 표시됩니다.</p>
+          <div>
+            <p class="eyebrow">Research Ledger</p>
+            <h2>분석 실행 목록</h2>
+            <p>각 행은 저장된 TradingAgents 분석 결과 1건입니다. “종목별 최신만”을 켜면 같은 종목의 최신 run만 표시됩니다.</p>
+          </div>
         </div>
-        <div class="table-wrap">
+        <div class="table-wrap premium-table">
           <table>
             <thead>
               <tr>
-                <th>티커</th><th>시장</th><th>기준일</th><th>최종 등급</th><th>액션</th><th>소스</th><th>모델</th><th>판단 요약</th><th>생성 시각</th><th></th>
+                <th>종목</th><th>시장</th><th>기준일</th><th>최종 등급</th><th>액션</th><th>검증</th><th>소스</th><th>모델</th><th>판단 요약</th><th>생성 시각</th><th></th>
               </tr>
             </thead>
             <tbody>
               {% for run in runs %}
               <tr>
-                <td><strong>{{ run.ticker }}</strong></td>
+                <td><strong class="ticker-symbol">{{ run.display_label }}</strong></td>
                 <td><span class="pill">{{ run.market }}{% if run.exchange %}/{{ run.exchange }}{% endif %}</span></td>
                 <td>{{ run.trade_date }}</td>
                 <td><span class="pill pill-{{ run.rating|lower }}">{{ run.rating }}</span></td>
                 <td>{{ run.trader_action }}</td>
+                <td>{% if run.structured_report_verified %}<span class="pill verified">검증 리포트</span>{% else %}<span class="pill">원문</span>{% endif %}</td>
                 <td>
                   {% if run.has_korean_news %}<span class="pill source">국내뉴스</span>{% endif %}
                   {% if run.has_dart_disclosures %}<span class="pill source">DART</span>{% endif %}
-                  {% if not run.has_korean_news and not run.has_dart_disclosures %}<span class="muted">-</span>{% endif %}
+                  {% if not run.has_korean_news and not run.has_dart_disclosures %}<span class="muted-inline">-</span>{% endif %}
                 </td>
                 <td class="mono">{{ run.quick_think_llm or '-' }} / {{ run.deep_think_llm or '-' }}</td>
                 <td class="summary">{{ run.decision_summary }}</td>
-                <td>{{ run.generated_at }}</td>
+                <td>{{ run.updated_label }}</td>
                 <td><a class="link-button" href="/runs/{{ run.run_id }}">상세 보기</a></td>
               </tr>
               {% else %}
-              <tr><td colspan="10" class="empty">조건에 맞는 실행 결과가 없습니다.</td></tr>
+              <tr><td colspan="11" class="empty">조건에 맞는 실행 결과가 없습니다.</td></tr>
               {% endfor %}
             </tbody>
           </table>
@@ -154,7 +263,7 @@
         jobsBody.innerHTML = jobs.map((job) => `
           <tr data-job-id="${escapeHtml(job.job_id)}">
             <td class="mono">${escapeHtml(job.job_id)}</td>
-            <td><span class="pill">${escapeHtml(job.status)}</span></td>
+            <td><span class="pill status-${escapeHtml(job.status)}">${escapeHtml(job.status)}</span></td>
             <td>${(job.tickers || []).map(escapeHtml).join(', ')}</td>
             <td>${escapeHtml(job.trade_date)}</td>
             <td>${escapeHtml(job.completed)} / ${escapeHtml(job.failed_count)}</td>

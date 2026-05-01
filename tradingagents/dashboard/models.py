@@ -22,6 +22,10 @@ class AnalysisRecord(TypedDict):
     structured_path: str
     metadata: Dict[str, Any]
     raw_state: Dict[str, Any]
+    structured_report: Dict[str, Any]
+    structured_report_verification: Dict[str, Any]
+    structured_report_verified: bool
+    structured_report_attempts: int
 
 
 class BatchSummary(TypedDict):
