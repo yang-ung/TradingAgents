@@ -19,6 +19,7 @@ from tradingagents.strategies.schema import parse_strategy_spec
 from .batch import DEFAULT_ARTIFACT_DIR, run_batch_analysis
 from .charts import get_price_chart
 from .extract import make_snippet
+from .scorecard import build_decision_scorecard
 from .storage import AnalysisRepository
 
 TEMPLATES_DIR = Path(__file__).parent / "templates"
@@ -566,6 +567,7 @@ def create_dashboard_app(
         backtest = build_strategy_backtest(record, chart)
         execution_replay = build_strategy_execution_replay(record, chart)
         structured_report = _prepare_structured_report_view(record.get("structured_report") or {})
+        scorecard = record.get("decision_scorecard") if isinstance(record.get("decision_scorecard"), dict) else build_decision_scorecard(record)
         structured_verification = record.get("structured_report_verification") or {}
         structured_verified = bool(record.get("structured_report_verified") and structured_verification.get("status") == "pass")
         return templates.TemplateResponse(
@@ -580,6 +582,7 @@ def create_dashboard_app(
                 "trade_plan": trade_plan,
                 "backtest": backtest,
                 "execution_replay": execution_replay,
+                "scorecard": scorecard,
                 "structured_report": structured_report,
                 "structured_verification": structured_verification,
                 "structured_verified": structured_verified,
@@ -637,6 +640,16 @@ def create_dashboard_app(
         if record is None:
             raise HTTPException(status_code=404, detail=f"Unknown run_id: {run_id}")
         return record
+
+    @app.get("/api/runs/{run_id}/scorecard")
+    def api_run_scorecard(run_id: str):
+        record = repository.get_run(run_id)
+        if record is None:
+            raise HTTPException(status_code=404, detail=f"Unknown run_id: {run_id}")
+        scorecard = record.get("decision_scorecard") if isinstance(record.get("decision_scorecard"), dict) else build_decision_scorecard(record)
+        if not scorecard or not scorecard.get("available"):
+            raise HTTPException(status_code=404, detail="decision scorecard unavailable")
+        return scorecard
 
     @app.get("/api/runs/{run_id}/chart")
     def api_run_chart(run_id: str):

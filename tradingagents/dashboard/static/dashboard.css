@@ -1096,3 +1096,95 @@ tr:hover td { background: rgba(255,255,255,0.025); }
     grid-template-columns: 1fr;
   }
 }
+
+
+.scorecard-panel {
+  margin: 22px 0;
+}
+.scorecard-summary {
+  color: var(--text-soft);
+  line-height: 1.65;
+  margin: 0 0 18px;
+}
+.scorecard-hero-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.scorecard-hero-grid div,
+.factor-score-card,
+.scorecard-evidence-grid article {
+  border: 1px solid var(--border-soft);
+  background: rgba(255,255,255,0.035);
+  border-radius: 18px;
+  padding: 16px;
+}
+.scorecard-hero-grid span,
+.factor-score-card small {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  margin-bottom: 8px;
+}
+.scorecard-hero-grid strong {
+  font-size: 34px;
+  letter-spacing: -0.04em;
+}
+.scorecard-hero-grid em {
+  display: block;
+  color: var(--text-soft);
+  font-style: normal;
+  margin-top: 4px;
+}
+.factor-score-list {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+.factor-score-card.tone-positive { border-color: rgba(34,197,94,0.28); }
+.factor-score-card.tone-negative { border-color: rgba(239,68,68,0.28); }
+.factor-score-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: baseline;
+  margin-bottom: 8px;
+}
+.factor-score-head span { color: var(--text); font-weight: 650; }
+.factor-score-head strong { font-size: 22px; }
+.factor-score-card p {
+  color: var(--text-soft);
+  margin: 0 0 10px;
+  line-height: 1.5;
+}
+.factor-score-card ul,
+.scorecard-evidence-grid ol {
+  margin: 12px 0 0;
+  padding-left: 18px;
+  color: var(--text-soft);
+}
+.scorecard-evidence-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+}
+.scorecard-evidence-grid h3 {
+  margin: 0 0 10px;
+  font-size: 15px;
+}
+.scorecard-evidence-grid li { margin-bottom: 10px; }
+.scorecard-evidence-grid li span {
+  display: block;
+  color: var(--muted);
+  margin-top: 4px;
+  line-height: 1.45;
+}
+@media (max-width: 1080px) {
+  .factor-score-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .scorecard-evidence-grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 760px) {
+  .scorecard-hero-grid, .factor-score-list { grid-template-columns: 1fr; }
+}

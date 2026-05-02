@@ -50,6 +50,50 @@
         </aside>
       </header>
 
+      {% if scorecard.available %}
+      <section class="panel scorecard-panel" id="scorecard">
+        <div class="panel-header split">
+          <div>
+            <p class="eyebrow">팩터별 판단</p>
+            <h2>판단 점수판</h2>
+          </div>
+          <span class="pill tone-info">{{ scorecard.final_action_label }}</span>
+        </div>
+        <p class="scorecard-summary">{{ scorecard.summary }}</p>
+        <div class="scorecard-hero-grid" aria-label="핵심 판단 점수">
+          <div><span>중기 방향성</span><strong class="{{ 'positive' if scorecard.direction_score >= 0 else 'negative' }}">{% if scorecard.direction_score > 0 %}+{% endif %}{{ scorecard.direction_score }}</strong><em>{{ scorecard.direction_label }}</em></div>
+          <div><span>현재 진입 타이밍</span><strong class="{{ 'positive' if scorecard.entry_timing_score >= 0 else 'negative' }}">{% if scorecard.entry_timing_score > 0 %}+{% endif %}{{ scorecard.entry_timing_score }}</strong><em>{{ scorecard.entry_timing_label }}</em></div>
+          <div><span>시장 공통 리스크</span><strong class="{{ 'positive' if scorecard.market_risk_score >= 0 else 'negative' }}">{% if scorecard.market_risk_score > 0 %}+{% endif %}{{ scorecard.market_risk_score }}</strong><em>{{ scorecard.market_risk_label }}</em></div>
+        </div>
+        <div class="factor-score-list">
+          {% for factor in scorecard.factors %}
+          <article class="factor-score-card tone-{{ factor.tone }}">
+            <div class="factor-score-head"><span>{{ factor.label }}</span><strong>{% if factor.score > 0 %}+{% endif %}{{ factor.score }}</strong></div>
+            <p>{{ factor.reason }}</p>
+            <small>{{ factor.scope }} · {{ factor.score_label }} · 신뢰도 {{ "%.0f"|format((factor.confidence or 0) * 100) }}%</small>
+            {% if factor.evidence %}<ul>{% for evidence in factor.evidence[:3] %}<li>{{ evidence }}</li>{% endfor %}</ul>{% endif %}
+          </article>
+          {% endfor %}
+        </div>
+        <div class="scorecard-evidence-grid">
+          <article>
+            <h3>긍정 근거 TOP</h3>
+            <ol>{% for factor in scorecard.positive_factors %}<li><strong>{{ factor.label }} {% if factor.score > 0 %}+{% endif %}{{ factor.score }}</strong><span>{{ factor.reason }}</span></li>{% endfor %}</ol>
+          </article>
+          <article>
+            <h3>부정 근거 TOP</h3>
+            <ol>{% for factor in scorecard.negative_factors %}<li><strong>{{ factor.label }} {{ factor.score }}</strong><span>{{ factor.reason }}</span></li>{% endfor %}</ol>
+          </article>
+          {% if scorecard.global_events %}
+          <article>
+            <h3>사회·정치·경제 공통 뉴스</h3>
+            <ol>{% for event in scorecard.global_events %}<li><strong>{{ event.label }} {{ event.score }}</strong><span>{{ event.reason }}</span></li>{% endfor %}</ol>
+          </article>
+          {% endif %}
+        </div>
+      </section>
+      {% endif %}
+
       {% if trade_plan.available %}
       <section class="trade-plan-grid" aria-label="매매 계획과 재분석 상태">
         <article class="panel trade-plan-card primary">

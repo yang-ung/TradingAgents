@@ -183,7 +183,9 @@ def build_analysis_record(
     }
     _attach_strategy_spec(record)
     from .reporting import structure_and_verify_report
+    from .scorecard import build_decision_scorecard
 
+    record["decision_scorecard"] = build_decision_scorecard(record)
     record.update(structure_and_verify_report(record))
     return record
 

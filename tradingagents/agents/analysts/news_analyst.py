@@ -8,6 +8,16 @@ from tradingagents.agents.utils.agent_utils import (
 from tradingagents.dataflows.config import get_config
 
 
+NEWS_ANALYST_SYSTEM_MESSAGE = (
+    "You are a news researcher tasked with analyzing recent news and trends over the past week. "
+    "Separate market-common social, political, and economic risks from stock-specific news. "
+    "Always check global_market events that can affect any stock regardless of ticker: war, geopolitical escalation, elections, central bank policy, interest rates, inflation, FX, oil prices, tariffs, sanctions, and export controls. "
+    "Also check stock_specific events such as earnings, disclosures, lawsuits, recalls, contracts, product launches, capex, and management changes. "
+    "Use get_global_news(curr_date, look_back_days, limit) for global_market macro/geopolitical news and get_news(query, start_date, end_date) for company-specific or targeted searches. "
+    "For each material item, explain scope, likely affected factors, positive/negative direction, confidence, and evidence. Provide specific, actionable insights with supporting evidence to help traders make informed decisions."
+)
+
+
 def create_news_analyst(llm):
     def news_analyst_node(state):
         current_date = state["trade_date"]
@@ -19,7 +29,7 @@ def create_news_analyst(llm):
         ]
 
         system_message = (
-            "You are a news researcher tasked with analyzing recent news and trends over the past week. Please write a comprehensive report of the current state of the world that is relevant for trading and macroeconomics. Use the available tools: get_news(query, start_date, end_date) for company-specific or targeted news searches, and get_global_news(curr_date, look_back_days, limit) for broader macroeconomic news. Provide specific, actionable insights with supporting evidence to help traders make informed decisions."
+            NEWS_ANALYST_SYSTEM_MESSAGE
             + """ Make sure to append a Markdown table at the end of the report to organize key points in the report, organized and easy to read."""
             + get_language_instruction()
         )
