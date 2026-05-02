@@ -101,9 +101,28 @@ Dashboard 상세 페이지와 API에서도 확인할 수 있다.
 
 ```text
 GET /api/runs/{run_id}/pre-live-validation
+GET /api/pre-live-validation?market=KR&latest_only=true&limit=100
 ```
 
 다종목 요약에는 `build_batch_pre_live_validation_report()`를 사용한다. 이 함수는 각 run의 pre-live 결과를 모아 `paper trading 후보`, `검증 실패`, `실전 허가 수(항상 0이어야 함)`를 요약한다.
+
+Gate B 시작을 위한 append-only paper trading ledger도 추가했다.
+
+```text
+POST /api/paper-trading/signals
+GET /api/paper-trading/signals?ticker=005930.KS
+```
+
+저장되는 기본 항목:
+
+- `signal_id`, `created_at`, `status=paper_trading`
+- `run_id`, `ticker`, `trade_date`, `strategy_id`, `signal_date`
+- `current_price`, `entry_low`, `entry_high`, `take_profit`, `stop_loss`
+- 방향성/진입 타이밍/시장 공통 리스크 점수
+- fill/PnL placeholder
+- `live_capital_allowed=False` 고정
+
+`live_capital_allowed=True` payload는 거부한다. 이 ledger는 실전 주문장이 아니라 Gate B 모의 운용 기록 저장소다.
 
 ## 다음 자동화 대상
 
@@ -112,5 +131,5 @@ GET /api/runs/{run_id}/pre-live-validation
    - 시장 공통 리스크가 나쁠 때 매수한 경우의 성과
    - 진입 타이밍 점수가 양수/음수일 때 성과
    - 방향성 점수와 실제 forward return 상관관계
-3. Paper trading ledger 저장소 추가
+3. Paper trading ledger에 매일 실제 OHLC 기준 체결 가능성/fill/PnL 업데이트
 4. 통과 전략만 dashboard에 `paper trading 후보`로 표시하고, 실전 투입은 Gate B/C 완료 전까지 계속 차단

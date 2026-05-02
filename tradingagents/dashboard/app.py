@@ -21,7 +21,8 @@ from .charts import get_price_chart
 from .extract import make_snippet
 from .scorecard import build_decision_scorecard
 from .storage import AnalysisRepository
-from tradingagents.validation.pre_live import build_pre_live_validation_report
+from tradingagents.validation.paper_trading import PaperTradingLedger
+from tradingagents.validation.pre_live import build_batch_pre_live_validation_report, build_pre_live_validation_report
 
 TEMPLATES_DIR = Path(__file__).parent / "templates"
 STATIC_DIR = Path(__file__).parent / "static"
@@ -456,6 +457,7 @@ def create_dashboard_app(
 ) -> FastAPI:
     app = FastAPI(title="TradingAgents Hybrid Dashboard")
     repository = AnalysisRepository(data_dir)
+    paper_ledger = PaperTradingLedger(data_dir)
     repository.recover_interrupted_batch_jobs()
     batch_executor = ThreadPoolExecutor(max_workers=max(1, BATCH_WORKERS), thread_name_prefix="dashboard-batch")
     app.state.batch_executor = batch_executor
@@ -608,6 +610,22 @@ def create_dashboard_app(
             {"health": repository.doctor(), "data_dir": repository.base_dir},
         )
 
+    @app.get("/api/paper-trading/signals")
+    def api_paper_trading_signals(
+        ticker: Optional[str] = None,
+        limit: int = Query(100, ge=1, le=500),
+        offset: int = Query(0, ge=0),
+    ):
+        signals = paper_ledger.list_signals(ticker=ticker, limit=limit, offset=offset)
+        return {"total": paper_ledger.count_signals(ticker=ticker), "limit": limit, "offset": offset, "signals": signals}
+
+    @app.post("/api/paper-trading/signals", status_code=201)
+    def api_record_paper_trading_signal(payload: dict[str, Any] = Body(...)):
+        try:
+            return paper_ledger.record_signal(payload)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
     @app.get("/api/runs")
     def api_runs(
         ticker: Optional[str] = None,
@@ -686,6 +704,45 @@ def create_dashboard_app(
         backtest = build_strategy_backtest(record, chart)
         scorecard = record.get("decision_scorecard") if isinstance(record.get("decision_scorecard"), dict) else build_decision_scorecard(record)
         return build_pre_live_validation_report(backtest, scorecard=scorecard)
+
+    @app.get("/api/pre-live-validation")
+    def api_batch_pre_live_validation(
+        ticker: Optional[str] = None,
+        market: Optional[str] = None,
+        rating: Optional[str] = None,
+        action: Optional[str] = None,
+        query: Optional[str] = None,
+        trade_date_from: Optional[str] = None,
+        trade_date_to: Optional[str] = None,
+        latest_only: bool = True,
+        limit: int = Query(100, ge=1, le=500),
+        offset: int = Query(0, ge=0),
+    ):
+        filters = _filters(
+            ticker=ticker,
+            market=market,
+            rating=rating,
+            action=action,
+            query=query,
+            trade_date_from=trade_date_from,
+            trade_date_to=trade_date_to,
+        )
+        rows = repository.list_runs(**filters, latest_only=latest_only, limit=limit, offset=offset)
+        items: list[dict[str, Any]] = []
+        for row in rows:
+            record = repository.get_run(str(row.get("run_id") or ""))
+            if record is None:
+                continue
+            chart = get_price_chart(record["ticker"], record["trade_date"])
+            backtest = build_strategy_backtest(record, chart)
+            scorecard = record.get("decision_scorecard") if isinstance(record.get("decision_scorecard"), dict) else build_decision_scorecard(record)
+            items.append({"run_id": record.get("run_id"), "ticker": record.get("ticker"), "backtest": backtest, "scorecard": scorecard})
+        result = build_batch_pre_live_validation_report(items)
+        result["limit"] = limit
+        result["offset"] = offset
+        result["latest_only"] = latest_only
+        result["filters"] = filters
+        return result
 
     @app.get("/api/runs/{run_id}/signal")
     def api_run_signal(run_id: str, position_open: bool = False):

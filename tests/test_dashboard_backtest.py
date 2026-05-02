@@ -284,6 +284,45 @@ def test_dashboard_detail_renders_pre_live_validation_and_api(tmp_path, sample_r
 
 
 @pytest.mark.unit
+def test_dashboard_batch_pre_live_validation_api_summarizes_latest_runs(tmp_path, sample_record, monkeypatch):
+    from tradingagents.dashboard import app as dashboard_app
+
+    def fake_get_price_chart(ticker, trade_date, lookback_days=180):
+        points = [
+            {"date": "2026-01-01", "open": 100.0, "high": 101.0, "low": 99.0, "close": 100.0},
+            {"date": "2026-01-02", "open": 101.0, "high": 103.0, "low": 98.0, "close": 102.0},
+            {"date": "2026-01-03", "open": 102.0, "high": 112.0, "low": 101.0, "close": 110.0},
+        ]
+        return {"available": True, "ticker": ticker, "currency": "KRW", "points": points}
+
+    monkeypatch.setattr(dashboard_app, "get_price_chart", fake_get_price_chart)
+    repository = AnalysisRepository(tmp_path)
+    for ticker in ("AAA.KS", "BBB.KS"):
+        record = dict(sample_record)
+        record["run_id"] = f"{ticker.lower()}-2026-01-01"
+        record["ticker"] = ticker
+        record["trade_date"] = "2026-01-01"
+        record["generated_at"] = f"2026-01-01T00:00:0{1 if ticker == 'AAA.KS' else 2}+00:00"
+        reports = dict(record["reports"])
+        reports["quant_strategy_report"] = "진입 99-101 KRW, 익절 110 KRW, 손절 94 KRW"
+        record["reports"] = reports
+        record.pop("strategy_spec", None)
+        repository.save(record)
+    client = TestClient(create_dashboard_app(tmp_path))
+
+    response = client.get("/api/pre-live-validation?market=KR&latest_only=true&limit=10")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["total"] == 2
+    assert payload["live_capital_allowed_count"] == 0
+    assert payload["failed_count"] == 2
+    assert payload["paper_trading_candidate_count"] == 0
+    assert {item["ticker"] for item in payload["failures"]} == {"AAA.KS", "BBB.KS"}
+    assert all("표본 부족" in item["failure_reasons"] for item in payload["failures"])
+
+
+@pytest.mark.unit
 def test_dashboard_detail_renders_strategy_execution_replay_and_api(tmp_path, sample_record, monkeypatch):
     from tradingagents.dashboard import app as dashboard_app
 
