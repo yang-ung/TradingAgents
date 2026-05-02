@@ -10,6 +10,7 @@ Before changing code, identify the smallest interpretation that satisfies the re
 - Ask only when the ambiguity materially changes what file/API/data path should be touched.
 - Push back on requests that imply live trading, capital deployment, or guaranteed profit before validation gates are satisfied.
 - Prefer deterministic program logic for validation, replay, trigger detection, and paper-trading state updates. Use agents to interpret and summarize, not to silently redefine execution rules.
+- Use `docs/agent_program_boundary.md` as the source of truth when deciding whether new trading behavior belongs in Agent prompts or deterministic program code.
 
 ## 2. Simplicity First
 

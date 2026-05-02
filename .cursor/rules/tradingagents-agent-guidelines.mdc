@@ -14,6 +14,7 @@ Use these project-specific rules when writing, reviewing, or refactoring Trading
 - Ask only when the ambiguity materially changes what file/API/data path should be touched.
 - Push back on live-trading, capital deployment, or profit-guarantee implications before validation gates are satisfied.
 - Prefer deterministic program logic for validation, replay, trigger detection, and paper-trading state updates.
+- Use `docs/agent_program_boundary.md` as the source of truth for deciding whether trading behavior belongs in Agent prompts or deterministic program code.
 
 ## Simplicity First
 
