@@ -61,7 +61,8 @@ def create_portfolio_manager(llm):
 
 ---
 
-Be decisive and ground every conclusion in specific evidence from the analysts.{get_language_instruction()}"""
+Be decisive and ground every conclusion in specific evidence from the analysts.
+Before finalizing, run the same practical gate the user will see in the dashboard: separate direction from entry timing, identify market-common risk, compare positive/negative evidence, and reduce/avoid exposure when common risk is severe or no executable stop-loss exists.{get_language_instruction()}"""
 
         final_trade_decision = invoke_structured_or_freetext(
             structured_llm,

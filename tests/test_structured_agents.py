@@ -147,6 +147,26 @@ class TestTraderAgent:
         prompt = captured["prompt"]
         assert any("Proposed Investment Plan" in m["content"] for m in prompt)
 
+    def test_prompt_forces_market_common_risk_and_timing_check(self):
+        captured = {}
+        llm = _structured_trader_llm(captured)
+        trader = create_trader(llm)
+        state = _make_trader_state()
+        state.update(
+            {
+                "news_report": "global_market: 전쟁 확산과 유가 급등",
+                "market_report": "RSI 과열, 가격 이격 확대",
+                "fundamentals_report": "저평가",
+                "sentiment_report": "수급 혼조",
+            }
+        )
+        trader(state)
+        combined = "\n".join(m["content"] for m in captured["prompt"])
+        assert "Market-common risk gate" in combined
+        assert "directional view from entry timing" in combined
+        assert "global_market: 전쟁 확산" in combined
+        assert "RSI 과열" in combined
+
     def test_falls_back_to_freetext_when_structured_unavailable(self):
         plain_response = (
             "**Action**: Sell\n\nGuidance cut hits margins.\n\n"
@@ -221,6 +241,17 @@ class TestResearchManagerAgent:
         prompt = captured["prompt"]
         for tier in ("Buy", "Overweight", "Hold", "Underweight", "Sell"):
             assert f"**{tier}**" in prompt, f"missing {tier} in prompt"
+
+    def test_prompt_requires_direction_timing_and_market_common_risk(self):
+        captured = {}
+        llm = _structured_rm_llm(captured)
+        rm = create_research_manager(llm)
+        rm(_make_rm_state())
+        prompt = captured["prompt"]
+        assert "market-common" in prompt
+        assert "direction score" in prompt
+        assert "entry timing" in prompt
+        assert "positive/negative" in prompt
 
     def test_falls_back_to_freetext_when_structured_unavailable(self):
         plain_response = "**Recommendation**: Sell\n\n**Rationale**: ...\n\n**Strategic Actions**: ..."

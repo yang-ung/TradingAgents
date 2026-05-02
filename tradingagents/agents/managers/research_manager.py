@@ -42,7 +42,8 @@ Commit to a clear stance whenever the debate's strongest arguments warrant one; 
 **Debate History:**
 {history}
 
-Be decisive and ground every conclusion in specific evidence from the debate.{get_language_instruction()}"""
+Be decisive and ground every conclusion in specific evidence from the debate.
+Before choosing the rating, explicitly synthesize a factor scorecard in prose: direction score, entry timing, market-common risk, and positive/negative evidence balance. Treat severe market-common risks (war/geopolitics, rates, FX, oil, tariffs, sanctions, global risk-off) as a veto or sizing reducer unless the debate provides strong contrary evidence. Do not collapse a positive company thesis into an immediate Buy when entry timing is poor.{get_language_instruction()}"""
 
         investment_plan = invoke_structured_or_freetext(
             structured_llm,
