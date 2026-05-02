@@ -31,6 +31,7 @@ def test_paper_trading_ledger_records_signal_without_allowing_live_capital(tmp_p
 
     assert signal["signal_id"].startswith("paper-")
     assert signal["status"] == "paper_trading"
+    assert signal["lifecycle_status"] == "paper_candidate"
     assert signal["live_capital_allowed"] is False
     assert signal["ticker"] == "005930.KS"
     assert signal["levels"] == {"entry_low": 196000.0, "entry_high": 196000.0, "take_profit": 222500.0, "stop_loss": 188000.0}
@@ -47,6 +48,8 @@ def test_paper_trading_ledger_rejects_live_or_incomplete_payloads(tmp_path):
         ledger.record_signal({"run_id": "run-1"})
     with pytest.raises(ValueError, match="live capital"):
         ledger.record_signal({"ticker": "005930.KS", "live_capital_allowed": True})
+    with pytest.raises(ValueError, match="paper trading candidate"):
+        ledger.record_signal(_paper_signal_payload(pre_live_status_label="검증 실패"))
 
 
 def _paper_signal_payload(**overrides):
@@ -85,6 +88,7 @@ def test_paper_trading_ledger_updates_fill_exit_and_cost_adjusted_pnl(tmp_path):
     )
 
     assert updated["status"] == "paper_closed"
+    assert updated["lifecycle_status"] == "paper_closed"
     assert updated["live_capital_allowed"] is False
     assert updated["fill"]["fillable"] is True
     assert updated["fill"]["assumed_fill_price"] == 101.0
@@ -130,6 +134,7 @@ def test_paper_trading_ledger_preserves_open_state_across_incremental_updates(tm
         capital=100_000_000,
     )
     assert open_signal["status"] == "paper_open"
+    assert open_signal["lifecycle_status"] == "paper_open"
 
     closed = ledger.update_signal_with_ohlc(
         signal["signal_id"],
@@ -191,6 +196,7 @@ def test_paper_trading_ledger_ignores_pre_entry_candles_for_existing_open_signal
         capital=100_000_000,
     )
     assert open_signal["status"] == "paper_open"
+    assert open_signal["lifecycle_status"] == "paper_open"
 
     closed = ledger.update_signal_with_ohlc(
         signal["signal_id"],

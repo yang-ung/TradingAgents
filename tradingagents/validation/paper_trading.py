@@ -36,6 +36,9 @@ class PaperTradingLedger:
         ticker = str(payload.get("ticker") or "").strip().upper()
         if not ticker:
             raise ValueError("ticker is required")
+        pre_live_status_label = str(payload.get("pre_live_status_label") or "").strip()
+        if pre_live_status_label != "paper trading 후보":
+            raise ValueError("paper trading signal requires a paper trading candidate pre-live status")
 
         now = _utc_now_iso()
         signal = {
@@ -43,6 +46,7 @@ class PaperTradingLedger:
             "created_at": now,
             "updated_at": now,
             "status": "paper_trading",
+            "lifecycle_status": "paper_candidate",
             "live_capital_allowed": False,
             "run_id": str(payload.get("run_id") or ""),
             "ticker": ticker,
@@ -61,7 +65,7 @@ class PaperTradingLedger:
                 "entry_timing_score": _optional_int(payload.get("entry_timing_score")),
                 "market_risk_score": _optional_int(payload.get("market_risk_score")),
             },
-            "pre_live_status_label": str(payload.get("pre_live_status_label") or ""),
+            "pre_live_status_label": pre_live_status_label,
             "fill": {
                 "fillable": None,
                 "assumed_fill_price": None,
@@ -107,6 +111,7 @@ class PaperTradingLedger:
             updated["status"] = "paper_open"
         else:
             updated["status"] = "paper_not_filled"
+        updated["lifecycle_status"] = updated["status"]
         self._append(updated)
         return updated
 

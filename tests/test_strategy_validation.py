@@ -67,6 +67,7 @@ def test_pre_live_validation_report_converts_backtest_trades_to_paper_trading_ca
 
     assert report["available"] is True
     assert report["status_label"] == "paper trading 후보"
+    assert report["lifecycle_status"] == "paper_candidate"
     assert report["paper_trading_candidate"] is True
     assert report["live_capital_allowed"] is False
     assert report["metrics"]["adjusted_returns_percent"] == [4.7, -2.3, 2.7]
@@ -93,10 +94,23 @@ def test_pre_live_validation_report_fails_closed_for_low_sample_and_severe_marke
     )
 
     assert report["status_label"] == "검증 실패"
+    assert report["lifecycle_status"] == "prelive_failed"
     assert report["paper_trading_candidate"] is False
     assert report["live_capital_allowed"] is False
     assert "표본 부족" in report["failure_reasons"]
     assert "시장 공통 리스크 매우 부정" in report["failure_reasons"]
+
+
+@pytest.mark.unit
+def test_pre_live_validation_report_marks_unavailable_as_prelive_failed():
+    from tradingagents.validation.pre_live import build_pre_live_validation_report
+
+    report = build_pre_live_validation_report({"available": False, "reason": "missing_strategy_spec"})
+
+    assert report["status_label"] == "검증 불가"
+    assert report["lifecycle_status"] == "prelive_failed"
+    assert report["paper_trading_candidate"] is False
+    assert report["live_capital_allowed"] is False
 
 
 @pytest.mark.unit
