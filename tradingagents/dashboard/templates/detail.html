@@ -199,6 +199,40 @@
         {% endif %}
       </section>
 
+      <section class="panel pre-live-validation-panel" id="pre-live-validation">
+        <div class="panel-header split">
+          <div>
+            <p class="eyebrow">실전 투입 전 검증</p>
+            <h2>Pre-live 검증 Gate</h2>
+          </div>
+          <span class="pill {{ 'tone-positive' if pre_live_validation.paper_trading_candidate else 'tone-negative' }}">{{ pre_live_validation.status_label }}</span>
+        </div>
+        {% if pre_live_validation.available %}
+        <div class="backtest-levels" aria-label="실전 투입 전 검증 요약">
+          <div><span>표본 수</span><strong>{{ pre_live_validation.metrics.trade_count }}회</strong></div>
+          <div><span>비용 반영 수익률</span><strong class="{{ 'positive' if pre_live_validation.metrics.total_return_percent > 0 else 'negative' }}">{% if pre_live_validation.metrics.total_return_percent > 0 %}+{% endif %}{{ "%.2f"|format(pre_live_validation.metrics.total_return_percent) }}%</strong></div>
+          <div><span>벤치마크 대비</span><strong class="{{ 'positive' if pre_live_validation.benchmark.excess_return_percent >= 0 else 'negative' }}">{% if pre_live_validation.benchmark.excess_return_percent >= 0 %}+{% endif %}{{ "%.2f"|format(pre_live_validation.benchmark.excess_return_percent) }}%</strong></div>
+          <div><span>1억원 기준 손익</span><strong class="{{ 'positive' if pre_live_validation.capital.pnl >= 0 else 'negative' }}">{% if pre_live_validation.capital.pnl >= 0 %}+{% endif %}{{ pre_live_validation.capital.pnl|money(chart.currency) }}</strong></div>
+          <div><span>승률</span><strong>{{ "%.2f"|format(pre_live_validation.metrics.win_rate_percent) }}%</strong></div>
+          <div><span>Profit Factor</span><strong>{{ pre_live_validation.metrics.profit_factor }}</strong></div>
+          <div><span>최대낙폭</span><strong>{{ "%.2f"|format(pre_live_validation.metrics.max_drawdown_percent) }}%</strong></div>
+          <div><span>왕복 비용</span><strong>{{ "%.2f"|format(pre_live_validation.costs.round_trip_cost_percent) }}%</strong></div>
+        </div>
+        {% if pre_live_validation.failure_reasons %}
+        <div class="trade-log">
+          <h3>탈락/보류 사유</h3>
+          <ul>{% for reason in pre_live_validation.failure_reasons %}<li><span>{{ reason }}</span><em>실전 투입 보류</em></li>{% endfor %}</ul>
+        </div>
+        {% endif %}
+        <p class="backtest-disclaimer">{{ pre_live_validation.next_step }} 현재 Gate A 결과는 실전 자금 투입 허가가 아니라 paper trading 후보 선별입니다. 미래 수익을 보장하지 않습니다.</p>
+        {% else %}
+        <div class="empty-state">
+          <strong>실전 투입 전 검증을 계산할 수 없습니다.</strong>
+          <p>구조화된 전략, 가격 데이터, 거래 표본이 필요합니다.</p>
+        </div>
+        {% endif %}
+      </section>
+
       <section class="panel execution-replay-panel" id="execution-replay">
         <div class="panel-header split">
           <div>

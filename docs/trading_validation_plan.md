@@ -88,6 +88,23 @@ result = evaluate_trade_returns(
 )
 ```
 
+`tradingagents.validation.pre_live.build_pre_live_validation_report()`는 dashboard 백테스트 거래 로그를 Gate A pre-live 검증 리포트로 변환한다.
+
+- 거래별 수익률에 수수료/슬리피지 왕복 비용 차감
+- 표본 수, 승률, profit factor, 최대낙폭, 총수익률 gate 적용
+- 벤치마크 대비 초과수익 계산
+- 1억원 기준 손익 계산
+- 시장 공통 리스크가 `매우 부정`이면 fail-closed 처리
+- 통과해도 `live_capital_allowed=False` 유지, `paper trading 후보`로만 표시
+
+Dashboard 상세 페이지와 API에서도 확인할 수 있다.
+
+```text
+GET /api/runs/{run_id}/pre-live-validation
+```
+
+다종목 요약에는 `build_batch_pre_live_validation_report()`를 사용한다. 이 함수는 각 run의 pre-live 결과를 모아 `paper trading 후보`, `검증 실패`, `실전 허가 수(항상 0이어야 함)`를 요약한다.
+
 ## 다음 자동화 대상
 
 1. 저장된 `strategy_spec`와 가격 데이터를 묶어 다종목 walk-forward 결과 생성
@@ -96,4 +113,4 @@ result = evaluate_trade_returns(
    - 진입 타이밍 점수가 양수/음수일 때 성과
    - 방향성 점수와 실제 forward return 상관관계
 3. Paper trading ledger 저장소 추가
-4. 통과 전략만 dashboard에 `실전 후보`로 표시
+4. 통과 전략만 dashboard에 `paper trading 후보`로 표시하고, 실전 투입은 Gate B/C 완료 전까지 계속 차단

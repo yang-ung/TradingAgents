@@ -230,6 +230,60 @@ def test_dashboard_detail_renders_backtest_panel_and_api(tmp_path, sample_record
 
 
 @pytest.mark.unit
+def test_dashboard_detail_renders_pre_live_validation_and_api(tmp_path, sample_record, monkeypatch):
+    from tradingagents.dashboard import app as dashboard_app
+
+    def fake_get_price_chart(ticker, trade_date, lookback_days=180):
+        return {
+            "available": True,
+            "ticker": ticker,
+            "currency": "KRW",
+            "points": [
+                {"date": "2026-01-01", "open": 100.0, "high": 101.0, "low": 99.0, "close": 100.0},
+                {"date": "2026-01-02", "open": 101.0, "high": 103.0, "low": 98.0, "close": 102.0},
+                {"date": "2026-01-03", "open": 102.0, "high": 112.0, "low": 101.0, "close": 110.0},
+            ],
+            "latest_close": 110.0,
+            "first_close": 100.0,
+            "change": 10.0,
+            "change_percent": 10.0,
+            "min_close": 100.0,
+            "max_close": 110.0,
+            "start_date": "2026-01-01",
+            "end_date": "2026-01-03",
+            "path": "M 0 0 L 720 20",
+            "area_path": "M 0 0 L 720 20 L 720 220 L 0 220 Z",
+        }
+
+    monkeypatch.setattr(dashboard_app, "get_price_chart", fake_get_price_chart)
+    record = dict(sample_record)
+    reports = dict(record["reports"])
+    reports["quant_strategy_report"] = "진입 99-101 KRW, 익절 110 KRW, 손절 94 KRW"
+    record["reports"] = reports
+    record.pop("strategy_spec", None)
+    repository = AnalysisRepository(tmp_path)
+    stored = repository.save(record)
+    client = TestClient(create_dashboard_app(tmp_path))
+
+    response = client.get(f"/runs/{stored['run_id']}")
+
+    assert response.status_code == 200
+    assert "실전 투입 전 검증" in response.text
+    assert "검증 실패" in response.text
+    assert "실전 투입 보류" in response.text
+    assert "표본 부족" in response.text
+    assert "미래 수익을 보장하지 않습니다" in response.text
+
+    api_response = client.get(f"/api/runs/{stored['run_id']}/pre-live-validation")
+    assert api_response.status_code == 200
+    payload = api_response.json()
+    assert payload["available"] is True
+    assert payload["status_label"] == "검증 실패"
+    assert payload["live_capital_allowed"] is False
+    assert "표본 부족" in payload["failure_reasons"]
+
+
+@pytest.mark.unit
 def test_dashboard_detail_renders_strategy_execution_replay_and_api(tmp_path, sample_record, monkeypatch):
     from tradingagents.dashboard import app as dashboard_app
 

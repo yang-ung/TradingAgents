@@ -21,6 +21,7 @@ from .charts import get_price_chart
 from .extract import make_snippet
 from .scorecard import build_decision_scorecard
 from .storage import AnalysisRepository
+from tradingagents.validation.pre_live import build_pre_live_validation_report
 
 TEMPLATES_DIR = Path(__file__).parent / "templates"
 STATIC_DIR = Path(__file__).parent / "static"
@@ -568,6 +569,7 @@ def create_dashboard_app(
         execution_replay = build_strategy_execution_replay(record, chart)
         structured_report = _prepare_structured_report_view(record.get("structured_report") or {})
         scorecard = record.get("decision_scorecard") if isinstance(record.get("decision_scorecard"), dict) else build_decision_scorecard(record)
+        pre_live_validation = build_pre_live_validation_report(backtest, scorecard=scorecard)
         structured_verification = record.get("structured_report_verification") or {}
         structured_verified = bool(record.get("structured_report_verified") and structured_verification.get("status") == "pass")
         return templates.TemplateResponse(
@@ -583,6 +585,7 @@ def create_dashboard_app(
                 "backtest": backtest,
                 "execution_replay": execution_replay,
                 "scorecard": scorecard,
+                "pre_live_validation": pre_live_validation,
                 "structured_report": structured_report,
                 "structured_verification": structured_verification,
                 "structured_verified": structured_verified,
@@ -673,6 +676,16 @@ def create_dashboard_app(
             raise HTTPException(status_code=404, detail=f"Unknown run_id: {run_id}")
         chart = get_price_chart(record["ticker"], record["trade_date"])
         return build_strategy_execution_replay(record, chart)
+
+    @app.get("/api/runs/{run_id}/pre-live-validation")
+    def api_run_pre_live_validation(run_id: str):
+        record = repository.get_run(run_id)
+        if record is None:
+            raise HTTPException(status_code=404, detail=f"Unknown run_id: {run_id}")
+        chart = get_price_chart(record["ticker"], record["trade_date"])
+        backtest = build_strategy_backtest(record, chart)
+        scorecard = record.get("decision_scorecard") if isinstance(record.get("decision_scorecard"), dict) else build_decision_scorecard(record)
+        return build_pre_live_validation_report(backtest, scorecard=scorecard)
 
     @app.get("/api/runs/{run_id}/signal")
     def api_run_signal(run_id: str, position_open: bool = False):
