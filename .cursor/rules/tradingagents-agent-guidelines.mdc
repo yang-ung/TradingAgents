@@ -1,0 +1,67 @@
+---
+description: TradingAgents coding-agent guidelines adapted from Karpathy-style principles: think before coding, keep changes simple and surgical, and verify outcomes.
+alwaysApply: true
+---
+
+# TradingAgents coding-agent guidelines
+
+Use these project-specific rules when writing, reviewing, or refactoring TradingAgents code.
+
+## Think Before Coding
+
+- Identify the smallest interpretation that satisfies the request.
+- State assumptions when ambiguity changes the implementation path.
+- Ask only when the ambiguity materially changes what file/API/data path should be touched.
+- Push back on live-trading, capital deployment, or profit-guarantee implications before validation gates are satisfied.
+- Prefer deterministic program logic for validation, replay, trigger detection, and paper-trading state updates.
+
+## Simplicity First
+
+- Implement the minimum code that solves the current problem.
+- Do not add speculative frameworks, plugin systems, or broad configurability unless required.
+- Do not introduce abstractions for a single use case.
+- Keep validation and paper-trading logic explicit and auditable.
+- Add complexity only for real safety requirements: live-capital blocking, validation gates, cost/slippage handling, state immutability, replay correctness, or data integrity.
+
+## Surgical Changes
+
+- Touch only files directly related to the request.
+- Do not refactor adjacent code, prompts, templates, comments, formatting, or CSS as a drive-by improvement.
+- Match existing style and naming in the file being edited.
+- Remove only imports, variables, or helpers made unused by your change.
+- Mention unrelated dead code or design debt separately instead of fixing it in the same change.
+- Every changed line should trace back to the request, a failing test, or a required verification fix.
+
+## Goal-Driven Execution
+
+For non-trivial behavior changes:
+
+1. Define behavior and success criteria.
+2. Add or update focused tests first when practical.
+3. Run the focused test and verify it fails for the expected reason.
+4. Implement the smallest passing change.
+5. Run focused tests, relevant tests, and any lightweight smoke checks needed for the changed path.
+6. Check `git diff --check` before committing.
+
+Documentation-only or instruction-only changes do not need RED/GREEN tests, but still require diff review and formatting sanity checks.
+
+## Product and Safety Rules
+
+- User-facing dashboard/UI/report text should be Korean-first.
+- Do not expose internal state keys or raw markdown labels in user-facing UI, such as `quant_strategy_report`, `final_trade_decision`, `market_report`, `**Recommendation**`, or `**Action**`.
+- Translate action/strategy labels for users: `Buy` → `매수`, `Hold` → `보유/관망`, `Sell` → `매도`, `take profit` → `익절`, `stop loss` → `손절`, `pullback` → `눌림목`, `breakout` → `돌파`.
+- KRW amounts shown to users should use comma formatting and no decimal places where possible.
+- Avoid profit-certification language. Prefer `과거 적용 시뮬레이션`, `백테스트 시뮬레이션`, or `전략 실행 리플레이`.
+- Default stance before sufficient out-of-sample, walk-forward, and paper-trading evidence is `실거래 보류`.
+- `live_capital_allowed` must remain `False` unless a separately reviewed live-trading safety design explicitly changes it.
+- Gate A/pre-live validation can promote a strategy only to a paper-trading candidate, not to live capital.
+- Paper trading with daily OHLC data should use conservative assumptions: avoid overstated fills, prefer stop-loss when take-profit and stop-loss both touch in one candle, preserve open-state fill data across incremental updates, and keep closed trades immutable.
+
+## Review Checklist
+
+- [ ] Diff is limited to requested scope.
+- [ ] New or changed behavior has focused tests where practical.
+- [ ] Relevant tests and `git diff --check` pass.
+- [ ] User-facing labels are Korean/localized where applicable.
+- [ ] No secrets, credentials, API keys, tokens, or connection strings were added.
+- [ ] No live-capital path was introduced accidentally.
