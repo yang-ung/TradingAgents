@@ -626,6 +626,21 @@ def create_dashboard_app(
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 
+    @app.patch("/api/paper-trading/signals/{signal_id}/fill")
+    def api_update_paper_trading_fill(signal_id: str, payload: dict[str, Any] = Body(...)):
+        try:
+            return paper_ledger.update_signal_with_ohlc(
+                signal_id,
+                payload.get("candles") or [],
+                capital=payload.get("capital", 100_000_000),
+                commission_bps=payload.get("commission_bps", 5.0),
+                slippage_bps=payload.get("slippage_bps", 10.0),
+            )
+        except ValueError as exc:
+            message = str(exc)
+            status_code = 404 if "unknown signal_id" in message else 400
+            raise HTTPException(status_code=status_code, detail=message) from exc
+
     @app.get("/api/runs")
     def api_runs(
         ticker: Optional[str] = None,

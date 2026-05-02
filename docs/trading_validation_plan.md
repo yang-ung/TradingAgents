@@ -111,6 +111,7 @@ Gate B 시작을 위한 append-only paper trading ledger도 추가했다.
 ```text
 POST /api/paper-trading/signals
 GET /api/paper-trading/signals?ticker=005930.KS
+PATCH /api/paper-trading/signals/{signal_id}/fill
 ```
 
 저장되는 기본 항목:
@@ -122,6 +123,12 @@ GET /api/paper-trading/signals?ticker=005930.KS
 - fill/PnL placeholder
 - `live_capital_allowed=False` 고정
 
+`PATCH /api/paper-trading/signals/{signal_id}/fill`은 일봉 OHLC를 받아 진입 가능 여부와 익절/손절/PnL을 업데이트한다.
+append-only snapshot 방식이라 같은 `signal_id`의 최신 상태만 조회에 노출된다.
+이미 종료된 paper trade는 재개/강등하지 않고, 열린 포지션에 누적 OHLC를 다시 넣더라도 기존 진입일 이전 candle은 exit 판정에서 제외한다.
+일봉에서 익절가와 손절가가 같은 날 모두 터치되면 보수적으로 손절 우선으로 계산한다.
+기본 비용 모델은 pre-live와 동일하게 `commission_bps=5.0`, `slippage_bps=10.0`이며, 왕복 비용 0.30%를 수익률에서 차감한다.
+
 `live_capital_allowed=True` payload는 거부한다. 이 ledger는 실전 주문장이 아니라 Gate B 모의 운용 기록 저장소다.
 
 ## 다음 자동화 대상
@@ -131,5 +138,5 @@ GET /api/paper-trading/signals?ticker=005930.KS
    - 시장 공통 리스크가 나쁠 때 매수한 경우의 성과
    - 진입 타이밍 점수가 양수/음수일 때 성과
    - 방향성 점수와 실제 forward return 상관관계
-3. Paper trading ledger에 매일 실제 OHLC 기준 체결 가능성/fill/PnL 업데이트
+3. Paper trading ledger를 매일 실행해 새 OHLC로 fill/PnL 자동 업데이트
 4. 통과 전략만 dashboard에 `paper trading 후보`로 표시하고, 실전 투입은 Gate B/C 완료 전까지 계속 차단
