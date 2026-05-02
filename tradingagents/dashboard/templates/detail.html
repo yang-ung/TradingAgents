@@ -155,6 +155,46 @@
         {% endif %}
       </section>
 
+      <section class="panel execution-replay-panel" id="execution-replay">
+        <div class="panel-header split">
+          <div>
+            <p class="eyebrow">시스템 트레이딩 흐름</p>
+            <h2>전략 실행 리플레이</h2>
+          </div>
+          {% if execution_replay.available %}
+          <span class="pill {{ 'tone-negative' if execution_replay.pnl < 0 else 'tone-positive' }}">1억원 기준 손익 {% if execution_replay.pnl >= 0 %}+{% endif %}{{ execution_replay.pnl|money(execution_replay.currency) }}</span>
+          {% endif %}
+        </div>
+        {% if execution_replay.available %}
+        <div class="backtest-levels" aria-label="전략 실행 리플레이 요약">
+          <div><span>투입금</span><strong>{{ execution_replay.initial_capital|money(execution_replay.currency) }}</strong></div>
+          <div><span>최종 평가금</span><strong>{{ execution_replay.final_equity|money(execution_replay.currency) }}</strong></div>
+          <div><span>1억원 기준 손익</span><strong class="{{ 'negative' if execution_replay.pnl < 0 else 'positive' }}">{% if execution_replay.pnl >= 0 %}+{% endif %}{{ execution_replay.pnl|money(execution_replay.currency) }}</strong></div>
+          <div><span>수익률</span><strong class="{{ 'negative' if execution_replay.return_percent < 0 else 'positive' }}">{% if execution_replay.return_percent >= 0 %}+{% endif %}{{ "%.2f"|format(execution_replay.return_percent) }}%</strong></div>
+        </div>
+        {% if execution_replay.events %}
+        <div class="trade-log execution-log">
+          <h3>매수·매도·재분석 이벤트</h3>
+          <ul>
+            {% for event in execution_replay.events %}
+            <li>
+              <span>{{ event.date }} · {{ event.label }}{% if event.price %} {{ event.price|money(execution_replay.currency) }}{% endif %}</span>
+              {% if event.pnl is defined %}<strong class="{{ 'negative' if event.pnl < 0 else 'positive' }}">{% if event.pnl >= 0 %}+{% endif %}{{ event.pnl|money(execution_replay.currency) }}</strong>{% endif %}
+              <em>{% if event.type == 'buy' %}진입 구간 체결{% elif event.type == 'sell' and event.reason == 'stop_loss' %}손절{% elif event.type == 'sell' and event.reason == 'take_profit' %}익절{% elif event.type == 'reanalysis_required' %}재분석 전 자동 재진입 차단{% else %}{{ event.reason }}{% endif %}</em>
+            </li>
+            {% endfor %}
+          </ul>
+        </div>
+        {% endif %}
+        <p class="backtest-disclaimer">전략 실행 리플레이는 저장된 구조화 전략을 기준일 이후 가격에 순차 적용한 운용 흐름입니다. 손절·무효화가 발생하면 전략을 만료로 보고 새 Agent 재분석 전까지 자동 재진입을 차단합니다. 수수료·세금·슬리피지·분할체결·일봉 내부 체결 순서는 반영하지 않습니다.</p>
+        {% else %}
+        <div class="empty-state">
+          <strong>전략 실행 리플레이를 계산할 수 없습니다.</strong>
+          <p>구조화된 매매 전략과 가격 데이터가 있어야 매수·매도·재분석 흐름을 표시합니다.</p>
+        </div>
+        {% endif %}
+      </section>
+
       <section class="panel backtest-panel" id="backtest">
         <div class="panel-header split">
           <div>

@@ -196,7 +196,7 @@ def _attach_strategy_spec(record: Dict[str, Any]) -> None:
         reports = record.get("reports") if isinstance(record.get("reports"), dict) else {}
         direct_spec = extract_strategy_spec_from_text(str(reports.get("quant_strategy_report") or ""))
         if direct_spec is not None:
-            record["strategy_spec"] = direct_spec.model_dump()
+            record["strategy_spec"] = direct_spec.model_dump(exclude_none=True)
             return
 
         levels = extract_price_timing_levels(record)
@@ -206,9 +206,10 @@ def _attach_strategy_spec(record: Dict[str, Any]) -> None:
             ticker=record.get("ticker", ""),
             trade_date=record.get("trade_date", ""),
             levels=levels,
-            source="quant_strategy_report",
+            source="prose_price_timing",
+            reanalysis_triggers=[{"type": "price_below", "level": levels["stop_loss"], "reason": "손절가 이탈"}],
         )
-        record["strategy_spec"] = spec.model_dump()
+        record["strategy_spec"] = spec.model_dump(exclude_none=True)
     except Exception:
         return
 

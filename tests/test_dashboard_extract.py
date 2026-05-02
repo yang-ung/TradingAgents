@@ -88,3 +88,32 @@ def test_build_analysis_record_sanitizes_mixed_script_artifacts(sample_final_sta
     assert "펀더멘털" in record["reports"]["fundamentals_report"]
     assert "강세" in record["reports"]["investment_plan"]
     assert "펀더멘털" in record["raw_state"]["fundamentals_report"]
+
+
+@pytest.mark.unit
+def test_build_analysis_record_forces_strategy_spec_from_korean_trade_plan_prose(sample_final_state):
+    final_state = dict(sample_final_state)
+    final_state["company_of_interest"] = "005930.KS"
+    final_state["trade_date"] = "2026-03-01"
+    final_state["quant_strategy_report"] = "RSI 과열로 추격 매수는 피하고 눌림목 대기."
+    final_state["trader_investment_decision"] = (
+        "**Action**: Hold\n\n"
+        "추가 매수는 196000 부근 눌림 또는 과열 완화, 재돌파 확인 시 진행하며, "
+        "188000 이탈 또는 MACD 히스토그램 급감 시 증액을 중단한다. "
+        "목표가 222500원."
+    )
+    final_state["risk_debate_state"] = {
+        **final_state["risk_debate_state"],
+        "judge_decision": "**Rating**: Overweight\n\n**Executive Summary**: 점진 확대.\n\n**Time Horizon**: 1개월",
+    }
+
+    record = build_analysis_record(final_state, generated_at="2026-03-01T00:00:00+00:00")
+
+    spec = record["strategy_spec"]
+    assert spec["ticker"] == "005930.KS"
+    assert spec["trade_date"] == "2026-03-01"
+    assert spec["entry"] == {"type": "price_zone", "low": 196000.0, "high": 196000.0}
+    assert spec["take_profit"] == {"type": "fixed_price", "price": 222500.0}
+    assert spec["stop_loss"] == {"type": "fixed_price", "price": 188000.0}
+    assert spec["currency"] == "KRW"
+    assert {"type": "price_below", "level": 188000.0, "reason": "손절가 이탈"} in spec["reanalysis_triggers"]

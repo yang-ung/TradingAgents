@@ -125,6 +125,49 @@ def test_backtest_hides_periods_without_enough_history():
 
 
 @pytest.mark.unit
+def test_strategy_execution_replay_stops_after_stop_loss_and_shows_100m_pnl():
+    from tradingagents.dashboard.backtest import build_strategy_execution_replay
+
+    chart = {
+        "available": True,
+        "currency": "KRW",
+        "points": [
+            {"date": "2026-03-03", "open": 200000.0, "high": 201000.0, "low": 196000.0, "close": 197000.0},
+            {"date": "2026-03-04", "open": 190000.0, "high": 191000.0, "low": 188000.0, "close": 189000.0},
+            {"date": "2026-03-05", "open": 196000.0, "high": 197000.0, "low": 196000.0, "close": 196500.0},
+            {"date": "2026-03-06", "open": 188000.0, "high": 189000.0, "low": 188000.0, "close": 188500.0},
+        ],
+    }
+    record = {
+        "strategy_spec": {
+            "strategy_id": "005930.KS-2026-03-01-price-timing",
+            "ticker": "005930.KS",
+            "trade_date": "2026-03-01",
+            "entry": {"type": "price_zone", "low": 196000.0, "high": 196000.0},
+            "take_profit": {"type": "fixed_price", "price": 222500.0},
+            "stop_loss": {"type": "fixed_price", "price": 188000.0},
+            "currency": "KRW",
+            "reanalysis_triggers": [{"type": "price_below", "level": 188000.0, "reason": "손절가 이탈"}],
+        }
+    }
+
+    replay = build_strategy_execution_replay(record, chart, initial_capital=100_000_000)
+
+    assert replay["available"] is True
+    assert replay["initial_capital"] == 100_000_000
+    assert replay["final_equity"] == 95_920_000
+    assert replay["pnl"] == -4_080_000
+    assert replay["return_percent"] == -4.08
+    assert replay["reanalysis_required"] is True
+    assert replay["stopped_after_reanalysis"] is True
+    assert [event["type"] for event in replay["events"]] == ["buy", "sell", "reanalysis_required"]
+    assert replay["events"][0]["date"] == "2026-03-03"
+    assert replay["events"][1]["date"] == "2026-03-04"
+    assert replay["events"][1]["reason"] == "stop_loss"
+    assert replay["events"][2]["label"] == "재분석 필요"
+
+
+@pytest.mark.unit
 def test_backtest_marks_unavailable_without_valid_price_timing_levels():
     from tradingagents.dashboard.backtest import build_strategy_backtest
 
@@ -184,3 +227,65 @@ def test_dashboard_detail_renders_backtest_panel_and_api(tmp_path, sample_record
     assert api_response.status_code == 200
     assert api_response.json()["available"] is True
     assert api_response.json()["periods"]["전체"]["strategy_return_percent"] == 8.91
+
+
+@pytest.mark.unit
+def test_dashboard_detail_renders_strategy_execution_replay_and_api(tmp_path, sample_record, monkeypatch):
+    from tradingagents.dashboard import app as dashboard_app
+
+    def fake_get_price_chart(ticker, trade_date, lookback_days=180):
+        return {
+            "available": True,
+            "ticker": ticker,
+            "currency": "KRW",
+            "points": [
+                {"date": "2026-03-03", "open": 200000.0, "high": 201000.0, "low": 196000.0, "close": 197000.0},
+                {"date": "2026-03-04", "open": 190000.0, "high": 191000.0, "low": 188000.0, "close": 189000.0},
+                {"date": "2026-03-05", "open": 196000.0, "high": 197000.0, "low": 196000.0, "close": 196500.0},
+            ],
+            "latest_close": 196500.0,
+            "first_close": 197000.0,
+            "change": -500.0,
+            "change_percent": -0.25,
+            "min_close": 189000.0,
+            "max_close": 197000.0,
+            "start_date": "2026-03-03",
+            "end_date": "2026-03-05",
+            "path": "M 0 0 L 720 20",
+            "area_path": "M 0 0 L 720 20 L 720 220 L 0 220 Z",
+        }
+
+    monkeypatch.setattr(dashboard_app, "get_price_chart", fake_get_price_chart)
+    record = dict(sample_record)
+    record["ticker"] = "005930.KS"
+    record["trade_date"] = "2026-03-01"
+    record["strategy_spec"] = {
+        "strategy_id": "005930.KS-2026-03-01-price-timing",
+        "ticker": "005930.KS",
+        "trade_date": "2026-03-01",
+        "entry": {"type": "price_zone", "low": 196000.0, "high": 196000.0},
+        "take_profit": {"type": "fixed_price", "price": 222500.0},
+        "stop_loss": {"type": "fixed_price", "price": 188000.0},
+        "currency": "KRW",
+        "reanalysis_triggers": [{"type": "price_below", "level": 188000.0, "reason": "손절가 이탈"}],
+    }
+    repository = AnalysisRepository(tmp_path)
+    stored = repository.save(record)
+    client = TestClient(create_dashboard_app(tmp_path))
+
+    response = client.get(f"/runs/{stored['run_id']}")
+
+    assert response.status_code == 200
+    assert "전략 실행 리플레이" in response.text
+    assert "1억원 기준 손익" in response.text
+    assert "-4,080,000" in response.text
+    assert "2026-03-03" in response.text
+    assert "매수" in response.text
+    assert "2026-03-04" in response.text
+    assert "손절" in response.text
+    assert "재분석 전 자동 재진입 차단" in response.text
+
+    api_response = client.get(f"/api/runs/{stored['run_id']}/execution-replay")
+    assert api_response.status_code == 200
+    assert api_response.json()["pnl"] == -4_080_000
+    assert api_response.json()["events"][2]["type"] == "reanalysis_required"

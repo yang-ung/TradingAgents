@@ -13,7 +13,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from .backtest import build_strategy_backtest
+from .backtest import build_strategy_backtest, build_strategy_execution_replay
 from tradingagents.strategies import evaluate_reanalysis_triggers, evaluate_signal
 from tradingagents.strategies.schema import parse_strategy_spec
 from .batch import DEFAULT_ARTIFACT_DIR, run_batch_analysis
@@ -564,6 +564,7 @@ def create_dashboard_app(
         chart = get_price_chart(record["ticker"], record["trade_date"])
         trade_plan = _prepare_trade_plan_view(record, chart)
         backtest = build_strategy_backtest(record, chart)
+        execution_replay = build_strategy_execution_replay(record, chart)
         structured_report = _prepare_structured_report_view(record.get("structured_report") or {})
         structured_verification = record.get("structured_report_verification") or {}
         structured_verified = bool(record.get("structured_report_verified") and structured_verification.get("status") == "pass")
@@ -578,6 +579,7 @@ def create_dashboard_app(
                 "chart": chart,
                 "trade_plan": trade_plan,
                 "backtest": backtest,
+                "execution_replay": execution_replay,
                 "structured_report": structured_report,
                 "structured_verification": structured_verification,
                 "structured_verified": structured_verified,
@@ -650,6 +652,14 @@ def create_dashboard_app(
             raise HTTPException(status_code=404, detail=f"Unknown run_id: {run_id}")
         chart = get_price_chart(record["ticker"], record["trade_date"])
         return build_strategy_backtest(record, chart)
+
+    @app.get("/api/runs/{run_id}/execution-replay")
+    def api_run_execution_replay(run_id: str):
+        record = repository.get_run(run_id)
+        if record is None:
+            raise HTTPException(status_code=404, detail=f"Unknown run_id: {run_id}")
+        chart = get_price_chart(record["ticker"], record["trade_date"])
+        return build_strategy_execution_replay(record, chart)
 
     @app.get("/api/runs/{run_id}/signal")
     def api_run_signal(run_id: str, position_open: bool = False):

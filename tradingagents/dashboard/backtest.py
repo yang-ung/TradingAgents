@@ -20,6 +20,10 @@ _SINGLE_LEVEL_PATTERNS = {
     "take_profit": re.compile(r"(?:익절|목표|target|take\s*profit|take-profit)[^\d]{0,24}(?P<value>\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?)", re.IGNORECASE),
     "stop_loss": re.compile(r"(?:손절|stop\s*loss|stop-loss|invalidation|무효화)[^\d]{0,24}(?P<value>\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?)", re.IGNORECASE),
 }
+_STOP_LEVEL_AFTER_PRICE_RE = re.compile(
+    r"(?P<value>\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?)\s*(?:원|KRW)?\s*(?:이탈|하회|깨지|하향|아래)",
+    re.IGNORECASE,
+)
 _PERIODS = (
     ("1개월", 30),
     ("3개월", 90),
@@ -90,7 +94,13 @@ def extract_price_timing_levels(record: dict[str, Any], chart: dict[str, Any] | 
 def _match_single_level(text: str, key: str) -> float | None:
     pattern = _SINGLE_LEVEL_PATTERNS[key]
     match = pattern.search(text)
-    return _parse_price(match.group("value")) if match else None
+    if match:
+        return _parse_price(match.group("value"))
+    if key == "stop_loss":
+        stop_match = _STOP_LEVEL_AFTER_PRICE_RE.search(text)
+        if stop_match:
+            return _parse_price(stop_match.group("value"))
+    return None
 
 
 def _infer_currency(text: str) -> str:
@@ -253,4 +263,108 @@ def _simulate_long_strategy(points: list[dict[str, Any]], levels: dict[str, Any]
         "trade_count": len(trades),
         "win_rate_percent": round(wins / len(trades) * 100, 2) if trades else 0.0,
         "trades": trades,
+    }
+
+
+def build_strategy_execution_replay(record: dict[str, Any], chart: dict[str, Any], *, initial_capital: int = 100_000_000) -> dict[str, Any]:
+    """Replay one saved strategy and stop automatic re-entry after invalidation."""
+    if not chart.get("available"):
+        return {"available": False, "reason": "chart_unavailable", "events": []}
+    spec = parse_strategy_spec(record.get("strategy_spec") if isinstance(record, dict) else None)
+    if spec is None:
+        return {"available": False, "reason": "strategy_spec_unavailable", "events": []}
+    points = _valid_points(chart.get("points") or [])
+    if not points:
+        return {"available": False, "reason": "insufficient_price_history", "events": []}
+
+    levels = spec.to_price_timing_levels()
+    entry_low = float(levels["entry_low"])
+    entry_high = float(levels["entry_high"])
+    take_profit = float(levels["take_profit"])
+    stop_loss = float(levels["stop_loss"])
+    currency = levels.get("currency") or str(chart.get("currency") or "").upper()
+    cash = float(initial_capital)
+    shares = 0.0
+    entry_price: float | None = None
+    entry_capital: float | None = None
+    events: list[dict[str, Any]] = []
+    reanalysis_required = False
+    stopped_after_reanalysis = False
+
+    for point in points:
+        if reanalysis_required:
+            break
+        if shares == 0.0:
+            if point["low"] <= entry_high and point["high"] >= entry_low:
+                fill = min(max(entry_high, point["low"]), point["high"])
+                entry_capital = cash
+                shares = cash / fill
+                cash = 0.0
+                entry_price = fill
+                events.append({
+                    "type": "buy",
+                    "label": "매수",
+                    "date": point["date"],
+                    "price": round(fill, 4),
+                    "capital": int(round(entry_capital)),
+                    "reason": "entry_zone",
+                })
+            else:
+                continue
+
+        exit_price = None
+        exit_reason = None
+        exit_label = None
+        if point["low"] <= stop_loss:
+            exit_price = stop_loss
+            exit_reason = "stop_loss"
+            exit_label = "손절"
+        elif point["high"] >= take_profit:
+            exit_price = take_profit
+            exit_reason = "take_profit"
+            exit_label = "익절"
+
+        if exit_price is not None and entry_price is not None and entry_capital is not None:
+            display_return_percent = round((exit_price - entry_price) / entry_price * 100, 2)
+            cash = entry_capital * (1 + display_return_percent / 100)
+            shares = 0.0
+            trade_pnl = cash - entry_capital
+            events.append({
+                "type": "sell",
+                "label": exit_label,
+                "date": point["date"],
+                "price": round(exit_price, 4),
+                "reason": exit_reason,
+                "return_percent": display_return_percent,
+                "pnl": int(round(trade_pnl)),
+                "equity": int(round(cash)),
+            })
+            if exit_reason == "stop_loss":
+                reanalysis_required = True
+                stopped_after_reanalysis = True
+                events.append({
+                    "type": "reanalysis_required",
+                    "label": "재분석 필요",
+                    "date": point["date"],
+                    "price": round(exit_price, 4),
+                    "reason": "손절가 이탈",
+                    "auto_reentry_blocked": True,
+                })
+            entry_price = None
+            entry_capital = None
+
+    final_equity = cash if shares == 0.0 else shares * points[-1]["close"]
+    pnl = final_equity - float(initial_capital)
+    return {
+        "available": True,
+        "strategy": spec.strategy_type,
+        "strategy_id": spec.strategy_id,
+        "currency": currency,
+        "initial_capital": int(round(initial_capital)),
+        "final_equity": int(round(final_equity)),
+        "pnl": int(round(pnl)),
+        "return_percent": round(pnl / float(initial_capital) * 100, 2) if initial_capital else 0.0,
+        "reanalysis_required": reanalysis_required,
+        "stopped_after_reanalysis": stopped_after_reanalysis,
+        "events": events,
     }
