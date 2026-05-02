@@ -224,6 +224,84 @@ def test_dashboard_detail_renders_premium_stock_workspace_with_chart(tmp_path, s
 
 
 @pytest.mark.unit
+def test_dashboard_detail_renders_trade_plan_signal_and_reanalysis_cards(tmp_path, sample_record, monkeypatch):
+    from tradingagents.dashboard import app as dashboard_app
+
+    def fake_get_price_chart(ticker, trade_date, lookback_days=180):
+        return {
+            "available": True,
+            "ticker": ticker,
+            "currency": "KRW",
+            "points": [
+                {"date": "2026-05-02", "open": 335000.0, "high": 337000.0, "low": 331000.0, "close": 335000.0, "volume": 1000},
+                {"date": "2026-05-04", "open": 334000.0, "high": 334500.0, "low": 332000.0, "close": 333000.0, "volume": 1200},
+            ],
+            "moving_averages": {
+                "ma20": [
+                    {"time": "2026-05-02", "value": 334000.0},
+                    {"time": "2026-05-04", "value": 334000.0},
+                ]
+            },
+            "path": "M 0 100 L 720 20",
+            "area_path": "M 0 100 L 720 20 L 720 220 L 0 220 Z",
+            "latest_close": 333000.0,
+            "first_close": 335000.0,
+            "change": -2000.0,
+            "change_percent": -0.6,
+            "min_close": 333000.0,
+            "max_close": 335000.0,
+            "start_date": "2026-05-02",
+            "end_date": "2026-05-04",
+        }
+
+    monkeypatch.setattr(dashboard_app, "get_price_chart", fake_get_price_chart)
+    record = dict(
+        sample_record,
+        ticker="005930.KS",
+        strategy_spec={
+            "strategy_id": "005930.KS-2026-05-01-price-timing",
+            "ticker": "005930.KS",
+            "trade_date": "2026-05-01",
+            "strategy_type": "price_timing_long",
+            "execution_mode": "programmatic_rule_engine",
+            "entry": {"type": "price_zone", "low": 329000, "high": 334000},
+            "take_profit": {"type": "fixed_price", "price": 360000},
+            "stop_loss": {"type": "fixed_price", "price": 318000},
+            "currency": "KRW",
+            "source": "quant_strategy_report",
+            "valid_until": "2026-05-03",
+            "reanalysis_triggers": [
+                {"type": "moving_average_cross", "ma": "ma20", "direction": "down", "reason": "20일선 하향 이탈"}
+            ],
+        },
+    )
+    repository = AnalysisRepository(tmp_path)
+    stored = repository.save(record)
+    client = TestClient(create_dashboard_app(tmp_path))
+
+    response = client.get(f"/runs/{stored['run_id']}")
+
+    assert response.status_code == 200
+    assert "매매 계획" in response.text
+    assert "현재 시그널" in response.text
+    assert "매수" in response.text
+    assert "진입 구간" in response.text
+    assert "329,000 ~ 334,000" in response.text
+    assert "익절" in response.text
+    assert "360,000" in response.text
+    assert "손절" in response.text
+    assert "318,000" in response.text
+    assert "재분석 필요" in response.text
+    assert "20일선 하향 이탈" in response.text
+    assert "전략 유효기간 만료" in response.text
+    assert "Agent 재분석 후보" in response.text
+    assert "규칙 기반 자동 실행" in response.text
+    assert "moving_average_cross" not in response.text
+    assert "time_expired" not in response.text
+    assert "programmatic_rule_engine" not in response.text
+
+
+@pytest.mark.unit
 def test_dashboard_detail_shows_readable_company_name_for_korean_ticker(tmp_path, sample_record, monkeypatch):
     from tradingagents.dashboard import app as dashboard_app
 

@@ -50,6 +50,54 @@
         </aside>
       </header>
 
+      {% if trade_plan.available %}
+      <section class="trade-plan-grid" aria-label="매매 계획과 재분석 상태">
+        <article class="panel trade-plan-card primary">
+          <div class="panel-header split">
+            <div>
+              <p class="eyebrow">매매 계획</p>
+              <h2>{{ trade_plan.strategy_label }}</h2>
+            </div>
+            <span class="pill tone-{{ trade_plan.action_tone }}">현재 시그널 · {{ trade_plan.action_label }}</span>
+          </div>
+          <div class="trade-plan-levels">
+            <div><span>진입 구간</span><strong>{{ trade_plan.levels.entry_low|money(trade_plan.levels.currency) }} ~ {{ trade_plan.levels.entry_high|money(trade_plan.levels.currency) }}</strong></div>
+            <div><span>익절</span><strong>{{ trade_plan.levels.take_profit|money(trade_plan.levels.currency) }}</strong></div>
+            <div><span>손절</span><strong>{{ trade_plan.levels.stop_loss|money(trade_plan.levels.currency) }}</strong></div>
+            <div><span>현재가</span><strong>{{ trade_plan.latest_price|money(trade_plan.levels.currency) }}</strong></div>
+          </div>
+          <p class="trade-plan-reason">{{ trade_plan.signal_date }} 기준 · {{ trade_plan.reason }}{% if trade_plan.distance_to_entry is not none %} · 진입 구간과의 거리 {{ trade_plan.distance_to_entry|money(trade_plan.levels.currency) }}{% endif %}</p>
+          {% if trade_plan.avoid_conditions %}
+          <ul class="avoid-condition-list">
+            {% for condition in trade_plan.avoid_conditions %}<li>{{ condition }}</li>{% endfor %}
+          </ul>
+          {% endif %}
+        </article>
+        <article class="panel trade-plan-card reanalysis" data-required="{{ 'true' if trade_plan.reanalysis_required else 'false' }}">
+          <div class="panel-header split">
+            <div>
+              <p class="eyebrow">Agent 재분석 후보</p>
+              <h2>{{ trade_plan.reanalysis_label }}</h2>
+            </div>
+            <span class="pill tone-{{ trade_plan.reanalysis_tone }}">{{ '트리거 발생' if trade_plan.reanalysis_required else '트리거 없음' }}</span>
+          </div>
+          {% if trade_plan.triggers %}
+          <ul class="trigger-list">
+            {% for trigger in trade_plan.triggers %}
+            <li><strong>{{ trigger.reason or trigger.type_label }}</strong><span>{{ trigger.type_label }}</span></li>
+            {% endfor %}
+          </ul>
+          {% else %}
+          <p class="trade-plan-reason">현재 저장된 전략 조건에서는 Agent를 다시 호출할 신호가 없습니다.</p>
+          {% endif %}
+          <dl class="mini-meta">
+            <div><dt>전략 유효기간</dt><dd>{{ trade_plan.valid_until or '-' }}</dd></div>
+            <div><dt>실행 방식</dt><dd>{{ trade_plan.execution_mode_label }}</dd></div>
+          </dl>
+        </article>
+      </section>
+      {% endif %}
+
       <section id="chart" class="panel market-panel market-chart">
         <div class="panel-header split">
           <div>

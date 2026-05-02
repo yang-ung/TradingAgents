@@ -293,6 +293,108 @@ def _points_with_moving_averages(chart: dict[str, Any]) -> list[dict[str, Any]]:
     return points
 
 
+_SIGNAL_ACTION_LABELS = {
+    "BUY": "매수",
+    "WAIT": "관망",
+    "HOLD": "보유",
+    "SELL_TAKE_PROFIT": "익절",
+    "SELL_STOP_LOSS": "손절",
+    "AVOID": "거래회피",
+    "NO_DATA": "데이터 없음",
+}
+
+_SIGNAL_ACTION_TONES = {
+    "BUY": "positive",
+    "WAIT": "info",
+    "HOLD": "info",
+    "SELL_TAKE_PROFIT": "positive",
+    "SELL_STOP_LOSS": "negative",
+    "AVOID": "warning",
+    "NO_DATA": "neutral",
+}
+
+
+_TRIGGER_TYPE_LABELS = {
+    "price_below": "가격 하향 이탈",
+    "price_above": "가격 상향 돌파",
+    "volume_spike": "거래량 급증",
+    "moving_average_cross": "이동평균 이탈",
+    "time_expired": "유효기간 만료",
+}
+
+_EXECUTION_MODE_LABELS = {
+    "programmatic_rule_engine": "규칙 기반 자동 실행",
+}
+
+
+def _prepare_trade_plan_view(record: dict[str, Any], chart: dict[str, Any]) -> dict[str, Any]:
+    spec = parse_strategy_spec(record.get("strategy_spec"))
+    if spec is None:
+        return {"available": False, "reason": "strategy_spec_unavailable"}
+    points = _points_with_moving_averages(chart) if isinstance(chart, dict) else []
+    if not points:
+        return {"available": False, "reason": "price_data_unavailable"}
+
+    latest = points[-1]
+    signal = evaluate_signal(spec, latest)
+    reanalysis = evaluate_reanalysis_triggers(spec, points)
+    action = str(signal.get("action") or "NO_DATA")
+    latest_price = signal.get("price") or latest.get("close") or latest.get("price")
+    distance_to_entry: float | None = None
+    try:
+        price = float(latest_price)
+        if price > spec.entry.high:
+            distance_to_entry = price - spec.entry.high
+        elif price < spec.entry.low:
+            distance_to_entry = spec.entry.low - price
+        else:
+            distance_to_entry = 0.0
+    except (TypeError, ValueError):
+        distance_to_entry = None
+
+    triggers = []
+    for trigger in reanalysis.get("triggers") or []:
+        if not isinstance(trigger, dict):
+            continue
+        trigger_type = str(trigger.get("type") or "")
+        triggers.append(
+            {
+                "reason": trigger.get("reason") or _TRIGGER_TYPE_LABELS.get(trigger_type, "재분석 조건 충족"),
+                "type_label": _TRIGGER_TYPE_LABELS.get(trigger_type, "재분석 조건"),
+            }
+        )
+
+    return {
+        "available": True,
+        "strategy_id": spec.strategy_id,
+        "execution_mode": spec.execution_mode,
+        "execution_mode_label": _EXECUTION_MODE_LABELS.get(spec.execution_mode, "전략 규칙 실행"),
+        "strategy_label": "가격 구간 기반 롱 전략",
+        "source": spec.source,
+        "signal": signal,
+        "action_label": _SIGNAL_ACTION_LABELS.get(action, action),
+        "action_tone": _SIGNAL_ACTION_TONES.get(action, "neutral"),
+        "reason": signal.get("reason") or "-",
+        "signal_date": signal.get("date") or latest.get("date") or "-",
+        "latest_price": latest_price,
+        "distance_to_entry": distance_to_entry,
+        "levels": {
+            "entry_low": spec.entry.low,
+            "entry_high": spec.entry.high,
+            "take_profit": spec.take_profit.price,
+            "stop_loss": spec.stop_loss.price,
+            "currency": spec.currency,
+        },
+        "valid_until": spec.valid_until,
+        "avoid_conditions": spec.avoid_conditions,
+        "reanalysis": reanalysis,
+        "reanalysis_required": bool(reanalysis.get("reanalysis_required")),
+        "reanalysis_label": "재분석 필요" if reanalysis.get("reanalysis_required") else "현재 전략 유지 가능",
+        "reanalysis_tone": "warning" if reanalysis.get("reanalysis_required") else "positive",
+        "triggers": triggers,
+    }
+
+
 def _prepare_dashboard_runs(runs: list[dict]) -> list[dict]:
     prepared: list[dict] = []
     for run in runs:
@@ -460,6 +562,7 @@ def create_dashboard_app(
         ]
         agent_sections = _prepare_agent_sections(record)
         chart = get_price_chart(record["ticker"], record["trade_date"])
+        trade_plan = _prepare_trade_plan_view(record, chart)
         backtest = build_strategy_backtest(record, chart)
         structured_report = _prepare_structured_report_view(record.get("structured_report") or {})
         structured_verification = record.get("structured_report_verification") or {}
@@ -473,6 +576,7 @@ def create_dashboard_app(
                 "sections": sections,
                 "agent_sections": agent_sections,
                 "chart": chart,
+                "trade_plan": trade_plan,
                 "backtest": backtest,
                 "structured_report": structured_report,
                 "structured_verification": structured_verification,
