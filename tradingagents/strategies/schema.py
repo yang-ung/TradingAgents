@@ -158,9 +158,54 @@ def parse_strategy_spec(raw: Any) -> StrategySpec | None:
     if not isinstance(raw, dict):
         return None
     try:
-        return StrategySpec.model_validate(raw)
+        return StrategySpec.model_validate(_normalize_strategy_spec_payload(raw))
     except Exception:
         return None
+
+
+def _normalize_strategy_spec_payload(raw: dict[str, Any]) -> dict[str, Any]:
+    payload = dict(raw)
+    for field in ("basis", "avoid_conditions"):
+        value = payload.get(field)
+        if isinstance(value, str):
+            payload[field] = [value]
+
+    triggers = payload.get("reanalysis_triggers")
+    if isinstance(triggers, list):
+        normalized_triggers: list[Any] = []
+        for trigger in triggers:
+            if not isinstance(trigger, dict):
+                normalized_triggers.append(trigger)
+                continue
+            normalized = dict(trigger)
+            if "reason" not in normalized and "reason_ko" in normalized:
+                normalized["reason"] = normalized.pop("reason_ko")
+            else:
+                normalized.pop("reason_ko", None)
+            if "lookback_days" not in normalized and "look_back_days" in normalized:
+                normalized["lookback_days"] = normalized.pop("look_back_days")
+            else:
+                normalized.pop("look_back_days", None)
+            trigger_type = normalized.get("type")
+            if trigger_type == "moving_average_cross":
+                direction = normalized.get("direction")
+                if direction in {"above", "above_close"}:
+                    normalized["direction"] = "up"
+                elif direction in {"below", "below_close"}:
+                    normalized["direction"] = "down"
+                if not normalized.get("ma") or normalized.get("direction") not in {"up", "down"}:
+                    continue
+            else:
+                normalized.pop("ma", None)
+                normalized.pop("direction", None)
+            if trigger_type != "volume_spike":
+                normalized.pop("multiplier", None)
+                normalized.pop("lookback_days", None)
+            if trigger_type != "time_expired":
+                normalized.pop("date", None)
+            normalized_triggers.append(normalized)
+        payload["reanalysis_triggers"] = normalized_triggers
+    return payload
 
 
 def extract_strategy_spec_from_text(text: str) -> StrategySpec | None:

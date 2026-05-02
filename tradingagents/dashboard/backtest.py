@@ -75,8 +75,8 @@ def extract_price_timing_levels(record: dict[str, Any], chart: dict[str, Any] | 
         if entry is not None:
             entry_low = entry_high = entry
 
-    take_profit = _match_single_level(text, "take_profit")
-    stop_loss = _match_single_level(text, "stop_loss")
+    take_profit = _match_single_level(text, "take_profit", min_value=entry_high)
+    stop_loss = _match_single_level(text, "stop_loss", max_value=entry_low)
     if entry_low is None or entry_high is None or take_profit is None or stop_loss is None:
         return None
     if stop_loss >= entry_low or take_profit <= entry_high:
@@ -91,15 +91,33 @@ def extract_price_timing_levels(record: dict[str, Any], chart: dict[str, Any] | 
     }
 
 
-def _match_single_level(text: str, key: str) -> float | None:
+def _match_single_level(
+    text: str,
+    key: str,
+    *,
+    min_value: float | None = None,
+    max_value: float | None = None,
+) -> float | None:
     pattern = _SINGLE_LEVEL_PATTERNS[key]
-    match = pattern.search(text)
-    if match:
-        return _parse_price(match.group("value"))
+    for match in pattern.finditer(text):
+        value = _parse_price(match.group("value"))
+        if value is None:
+            continue
+        if min_value is not None and value <= min_value:
+            continue
+        if max_value is not None and value >= max_value:
+            continue
+        return value
     if key == "stop_loss":
-        stop_match = _STOP_LEVEL_AFTER_PRICE_RE.search(text)
-        if stop_match:
-            return _parse_price(stop_match.group("value"))
+        for stop_match in _STOP_LEVEL_AFTER_PRICE_RE.finditer(text):
+            value = _parse_price(stop_match.group("value"))
+            if value is None:
+                continue
+            if min_value is not None and value <= min_value:
+                continue
+            if max_value is not None and value >= max_value:
+                continue
+            return value
     return None
 
 

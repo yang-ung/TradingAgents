@@ -124,6 +124,44 @@ StrategySpec:
 
 
 @pytest.mark.unit
+def test_extracts_strategyspec_json_with_string_basis_and_irrelevant_trigger_direction():
+    from tradingagents.strategies import extract_strategy_spec_from_text
+
+    report = '''### StrategySpec JSON
+```json
+{
+  "strategy_id": "005930.KS_trend_pullback_20260430",
+  "ticker": "005930.KS",
+  "trade_date": "2026-04-30",
+  "strategy_type": "price_timing_long",
+  "execution_mode": "programmatic_rule_engine",
+  "entry": {"type": "price_zone", "low": 217000, "high": 222000},
+  "take_profit": {"type": "fixed_price", "price": 234000},
+  "stop_loss": {"type": "fixed_price", "price": 214000},
+  "currency": "KRW",
+  "basis": "close_10_ema_219266, vwma_217469",
+  "avoid_conditions": "가격이 214000원 아래로 마감",
+  "confidence": 0.74,
+  "valid_until": "2026-05-07",
+  "reanalysis_triggers": [
+    {"type": "price_below", "level": 214000, "direction": "below_close", "reason": "손절가 이탈"}
+  ]
+}
+```
+'''
+
+    spec = extract_strategy_spec_from_text(report)
+
+    assert spec is not None
+    assert spec.entry.low == 217000
+    assert spec.take_profit.price == 234000
+    assert spec.basis == ["close_10_ema_219266, vwma_217469"]
+    assert spec.avoid_conditions == ["가격이 214000원 아래로 마감"]
+    assert spec.reanalysis_triggers[0].type == "price_below"
+    assert spec.reanalysis_triggers[0].direction is None
+
+
+@pytest.mark.unit
 def test_build_analysis_record_materializes_strategy_spec_from_quant_report():
     from tradingagents.dashboard.extract import build_analysis_record
 

@@ -69,6 +69,28 @@ def test_backtest_rejects_prose_levels_inside_entry_zone():
 
 
 @pytest.mark.unit
+def test_backtest_ignores_ordinal_target_labels_when_extracting_take_profit():
+    from tradingagents.dashboard.backtest import extract_price_timing_levels
+
+    record = {
+        "reports": {
+            "quant_strategy_report": "익절 / 목표가 계획\n\n### 1차 목표 구간\n**234000원 부근**\n손절 기준 **214000원**",
+            "trader_investment_decision": "**Entry Price**: 219000.0\n\n**Take Profit**: 234000.0\n\n**Stop Loss**: 214000.0",
+        }
+    }
+
+    levels = extract_price_timing_levels(record, {"currency": "KRW"})
+
+    assert levels == {
+        "entry_low": 219000.0,
+        "entry_high": 219000.0,
+        "take_profit": 234000.0,
+        "stop_loss": 214000.0,
+        "currency": "KRW",
+    }
+
+
+@pytest.mark.unit
 def test_backtest_uses_distinct_windows_for_each_period():
     from datetime import date, timedelta
 
