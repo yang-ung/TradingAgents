@@ -184,9 +184,9 @@ def test_dashboard_detail_renders_premium_stock_workspace_with_chart(tmp_path, s
     assert "NVDA" in response.text
     assert "market-chart" in response.text
     assert "lightweight-charts" in response.text
-    assert "MA5" in response.text
-    assert "MA20" in response.text
-    assert "MA60" in response.text
+    assert "5일 이동평균" in response.text
+    assert "20일 이동평균" in response.text
+    assert "60일 이동평균" in response.text
     assert "캔들" in response.text
     assert "데이터 소스" in response.text
     assert "가격 흐름" in response.text
@@ -221,6 +221,71 @@ def test_dashboard_detail_renders_premium_stock_workspace_with_chart(tmp_path, s
     assert "각 섹션은 요약된 핵심 bullet" not in response.text
     assert "필요한 섹션만 빠르게 확인" not in response.text
     assert not re.search(r">\d+자<", response.text)
+
+
+@pytest.mark.unit
+def test_dashboard_detail_renders_agent_detail_markdown_as_safe_html(tmp_path, sample_record, monkeypatch):
+    from tradingagents.dashboard import app as dashboard_app
+
+    monkeypatch.setattr(
+        dashboard_app,
+        "get_price_chart",
+        lambda ticker, trade_date, lookback_days=180: {"available": False, "reason": "test"},
+    )
+    record = dict(sample_record)
+    record["reports"] = dict(record["reports"])
+    record["reports"]["market_report"] = "## 핵심 요약\n\n- **강점**: 수요 회복\n- `리스크`: 가격 변동\n\n<script>alert('x')</script>"
+    repository = AnalysisRepository(tmp_path)
+    stored = repository.save(record)
+    client = TestClient(create_dashboard_app(tmp_path))
+
+    response = client.get(f"/runs/{stored['run_id']}")
+
+    assert response.status_code == 200
+    assert '<article class="report-body markdown-body">' in response.text
+    assert "<h2>핵심 요약</h2>" in response.text
+    assert "<li><strong>강점</strong>: 수요 회복</li>" in response.text
+    assert "<code>리스크</code>" in response.text
+    assert "<script>alert" not in response.text
+    assert "&lt;script&gt;alert" in response.text
+
+
+@pytest.mark.unit
+def test_dashboard_mobile_readability_css_targets_small_screens():
+    from tradingagents.dashboard import app as dashboard_app
+
+    css = (dashboard_app.STATIC_DIR / "dashboard.css").read_text()
+
+    assert "@media (max-width: 640px)" in css
+    assert ".stock-workspace .agent-analysis" in css
+    assert ".report-body.markdown-body" in css
+    assert "overflow-wrap: anywhere" in css
+    assert "-webkit-text-size-adjust: 100%" in css
+
+
+@pytest.mark.unit
+def test_dashboard_mobile_navigation_is_compact_app_style(tmp_path, sample_record):
+    from tradingagents.dashboard import app as dashboard_app
+
+    repository = AnalysisRepository(tmp_path)
+    repository.save(sample_record)
+    client = TestClient(create_dashboard_app(tmp_path))
+
+    response = client.get("/dashboards/crypto")
+    css = (dashboard_app.STATIC_DIR / "dashboard.css").read_text()
+
+    assert response.status_code == 200
+    assert "dashboard-tab-short" in response.text
+    assert ">크립토<" in response.text
+    assert 'aria-current="page"' in response.text
+    assert "@media (max-width: 720px)" in css
+    assert "position: fixed" in css
+    assert "bottom: max(10px, env(safe-area-inset-bottom))" in css
+    assert "overflow-x: hidden" in css
+    assert "flex: 1 1 0" in css
+    assert "min-height: 50px" in css
+    assert ".dashboard-tab strong," in css
+    assert "span:not(.dashboard-tab-short)" in css
 
 
 @pytest.mark.unit

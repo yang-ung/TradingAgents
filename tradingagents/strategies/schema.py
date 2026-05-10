@@ -216,7 +216,7 @@ def extract_strategy_spec_from_text(text: str) -> StrategySpec | None:
     trading directions return None instead of creating an unsafe executable rule.
     """
     text = str(text or "")
-    if "StrategySpec" not in text:
+    if "StrategySpec" not in text and "strategy_id" not in text:
         return None
 
     decoder = json.JSONDecoder()

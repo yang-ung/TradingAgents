@@ -317,13 +317,21 @@ class TradingAgentsGraph:
                 self._checkpointer_ctx = None
                 self.graph = self.workflow.compile()
 
-    def _run_graph(self, company_name, trade_date):
+    def propagate_reanalysis(self, company_name, trade_date, *, reanalysis_payload: dict[str, Any] | None = None):
+        """Run the graph with programmatic validation diagnostics for strategy revision."""
+        company_name = normalize_ticker_symbol(company_name)
+        self.ticker = company_name
+        return self._run_graph(company_name, trade_date, reanalysis_context=reanalysis_payload or {})
+
+    def _run_graph(self, company_name, trade_date, *, reanalysis_context: dict[str, Any] | None = None):
         """Execute the graph and write the resulting state to disk and memory log."""
         # Initialize state — inject memory log context for PM.
         past_context = self.memory_log.get_past_context(company_name)
         init_agent_state = self.propagator.create_initial_state(
             company_name, trade_date, past_context=past_context
         )
+        if reanalysis_context:
+            init_agent_state["reanalysis_context"] = reanalysis_context
         args = self.propagator.get_graph_args()
 
         # Inject thread_id so same ticker+date resumes, different date starts fresh.

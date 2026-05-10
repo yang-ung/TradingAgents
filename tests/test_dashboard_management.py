@@ -191,7 +191,8 @@ def test_dashboard_filters_api_latest_and_management_pages(tmp_path, sample_reco
     home = client.get("/?market=KR&latest_only=1")
     assert home.status_code == 200
     assert "필터" in home.text
-    assert "005930.KS" in home.text
+    assert "삼성전자" in home.text
+    assert "005930.KS" not in home.text
     assert "NVDA" not in home.text
     assert "최신만" in home.text
 

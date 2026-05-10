@@ -222,3 +222,7 @@ __marimo__/
 artifacts/
 .hermes/
 docs/plans/
+
+# Local TradingAgents runtime artifacts
+/artifacts
+/tmp_hourly_llm_view.json

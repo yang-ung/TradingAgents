@@ -100,7 +100,10 @@ def _match_single_level(
 ) -> float | None:
     pattern = _SINGLE_LEVEL_PATTERNS[key]
     for match in pattern.finditer(text):
-        value = _parse_price(match.group("value"))
+        value_text = match.group("value")
+        if _looks_like_ordinal_or_percent(text, match.end("value"), value_text):
+            continue
+        value = _parse_price(value_text)
         if value is None:
             continue
         if min_value is not None and value <= min_value:
@@ -119,6 +122,14 @@ def _match_single_level(
                 continue
             return value
     return None
+
+
+def _looks_like_ordinal_or_percent(text: str, value_end: int, value_text: str) -> bool:
+    """Avoid treating Korean ordinal labels such as 1차/2순위 as prices."""
+    if "," in str(value_text):
+        return False
+    suffix = str(text or "")[value_end:value_end + 8]
+    return bool(re.match(r"\s*(?:[.)]|차|순위|퍼센트|%)", suffix))
 
 
 def _infer_currency(text: str) -> str:
@@ -222,10 +233,14 @@ def _simulate_long_strategy(points: list[dict[str, Any]], levels: dict[str, Any]
     entry_price = None
     entry_date = None
     trades: list[dict[str, Any]] = []
+    entry_touch_days = 0
 
     for point in points:
+        entry_touched = point["low"] <= entry_high and point["high"] >= entry_low
+        if entry_touched:
+            entry_touch_days += 1
         if position == 0.0:
-            if point["low"] <= entry_high and point["high"] >= entry_low:
+            if entry_touched:
                 fill = min(max(entry_high, point["low"]), point["high"])
                 position = cash / fill
                 cash = 0.0
@@ -279,6 +294,9 @@ def _simulate_long_strategy(points: list[dict[str, Any]], levels: dict[str, Any]
         "benchmark_return_percent": round(benchmark_return, 2),
         "excess_return_percent": round(strategy_return - benchmark_return, 2),
         "trade_count": len(trades),
+        "entry_touch_days": entry_touch_days,
+        "entry_touch_percent": round(entry_touch_days / len(points) * 100, 2) if points else 0.0,
+        "sample_days": len(points),
         "win_rate_percent": round(wins / len(trades) * 100, 2) if trades else 0.0,
         "trades": trades,
     }

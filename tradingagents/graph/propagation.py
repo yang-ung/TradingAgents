@@ -24,6 +24,7 @@ class Propagator:
             "company_of_interest": company_name,
             "trade_date": str(trade_date),
             "past_context": past_context,
+            "reanalysis_context": {},
             "investment_debate_state": InvestDebateState(
                 {
                     "bull_history": "",

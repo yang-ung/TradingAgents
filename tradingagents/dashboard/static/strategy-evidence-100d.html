@@ -1,0 +1,175 @@
+<!doctype html><html lang='ko'><head><meta charset='utf-8'><title>전략 증거 리포트</title><style>
+    body{margin:0;background:#020617;color:#e5e7eb;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;line-height:1.55}.page{max-width:1180px;margin:0 auto;padding:32px}.hero,.panel{background:#0f172a;border:1px solid #1e293b;border-radius:22px;padding:24px;margin:18px 0;box-shadow:0 20px 60px #0006}h1,h2,h3{margin:0 0 10px}.muted{color:#94a3b8}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}.card{background:#111827;border:1px solid #263244;border-radius:16px;padding:16px}table{width:100%;border-collapse:collapse;margin-top:12px}th,td{padding:10px;border-bottom:1px solid #263244;text-align:right}th:first-child,td:first-child{text-align:left}th{color:#93c5fd}.pos{color:#22c55e}.neg{color:#f87171}pre{white-space:pre-wrap;background:#020617;border:1px solid #334155;border-radius:12px;padding:12px;overflow:auto}.chart{width:100%;height:auto;margin-top:12px}code{color:#bfdbfe}
+    </style></head><body><main class='page'><section class='hero'><p class='muted'>TradingAgents deterministic evidence report · 2026-05-04T14:52:08+00:00</p><h1>전략별 실제 데이터 기반 백테스트 증거</h1><p>FVG는 <b>단타/스윙 패턴 전략 중 하나</b>로만 분리했고, 장기 보유용 ETF는 별도 <code>ETFAllocationSpec</code> 배분 엔진으로 DCA 벤치마크와 비교했다. 모든 수치는 yfinance adjusted OHLC/Close에서 계산했고, LLM 판단으로 숫자를 만들지 않았다.</p><div class='grid'><div class='card'><b>단타</b><br>FVG retest v1 · 실제 OHLC 매수/익절/손절 이벤트</div><div class='card'><b>장기 ETF</b><br>DCA / 상시분산 / Adaptive Core / QLD 위성 비교</div><div class='card'><b>안전</b><br>live_capital_allowed=false · 주문 연동 없음</div></div></section><section class='panel'><h2>1. 단타 패턴 전략 100거래일 결과</h2><table><thead><tr><th>종목</th><th>전략</th><th>전략수익률</th><th>단순보유</th><th>초과</th><th>MDD</th><th>거래수</th><th>1억원 손익</th></tr></thead><tbody><tr><td>GLD</td><td>FVG retest v1</td><td>+12.23%</td><td>+8.29%</td><td>+3.94%</td><td>-6.76%</td><td>6</td><td>+12,228,324원</td></tr><tr><td>SCHD</td><td>FVG retest v1</td><td>+5.52%</td><td>+17.35%</td><td>-11.83%</td><td>-2.90%</td><td>4</td><td>+5,521,966원</td></tr><tr><td>SPY</td><td>FVG retest v1</td><td>-0.44%</td><td>+6.30%</td><td>-6.74%</td><td>-5.27%</td><td>2</td><td>-440,242원</td></tr><tr><td>QQQ</td><td>FVG retest v1</td><td>-5.35%</td><td>+8.53%</td><td>-13.88%</td><td>-10.72%</td><td>4</td><td>-5,352,819원</td></tr><tr><td>SOXL</td><td>FVG retest v1</td><td>-7.36%</td><td>+174.17%</td><td>-181.53%</td><td>-30.94%</td><td>6</td><td>-7,361,371원</td></tr><tr><td>QLD</td><td>FVG retest v1</td><td>-15.04%</td><td>+13.89%</td><td>-28.93%</td><td>-19.47%</td><td>8</td><td>-15,038,222원</td></tr></tbody></table></section><section class='panel'><h2>2. 장기 보유용 ETF 전략 최근 100거래일 비교</h2><p class='muted'>월 100만원 적립식 기준. 단순 DCA 70/30을 고정 벤치마크로 사용.</p><table><thead><tr><th>전략</th><th>납입금 대비 수익률</th><th>DCA 대비 초과</th><th>계좌 MDD</th><th>리밸런싱</th><th>손익</th></tr></thead><tbody><tr><td>QLD 20% 위성형</td><td>+8.15%</td><td>+1.65%</td><td>-9.43%</td><td>6</td><td>+489,192원</td></tr><tr><td>단순 DCA 70/30</td><td>+6.50%</td><td>+0.00%</td><td>-7.80%</td><td>6</td><td>+390,019원</td></tr><tr><td>Adaptive Core v2 균형형</td><td>+6.18%</td><td>-0.32%</td><td>-7.37%</td><td>6</td><td>+370,817원</td></tr><tr><td>상시분산 DCA</td><td>+5.42%</td><td>-1.08%</td><td>-6.77%</td><td>6</td><td>+325,228원</td></tr></tbody></table></section><section class='panel'><h3>GLD 실제 차트 + 매수/매도 지점</h3><p>거래 이벤트 11개 · 데이터 2025-12-09~2026-05-04</p><svg viewBox="0 0 860 260" class="chart"><rect width="860" height="260" rx="16" fill="#08111f"/><path d="M 48.0 196.9 L 55.7 194.4 L 63.4 188.1 L 71.0 184.8 L 78.7 184.2 L 86.4 184.1 L 94.1 178.9 L 101.7 180.0 L 109.4 179.4 L 117.1 165.5 L 124.8 157.3 L 132.4 159.9 L 140.1 152.6 L 147.8 180.0 L 155.5 179.6 L 163.2 183.4 L 170.8 180.5 L 178.5 164.7 L 186.2 158.0 L 193.9 163.9 L 201.5 160.5 L 209.2 156.0 L 216.9 144.3 L 224.6 145.2 L 232.2 138.7 L 239.9 142.7 L 247.6 145.7 L 255.3 121.7 L 262.9 112.1 L 270.6 99.7 L 278.3 90.3 L 286.0 80.2 L 293.7 63.0 L 301.3 35.1 L 309.0 33.1 L 316.7 110.0 L 324.4 136.9 L 332.0 95.9 L 339.7 96.4 L 347.4 114.7 L 355.1 94.2 L 362.7 76.7 L 370.4 83.7 L 378.1 75.8 L 385.8 100.3 L 393.5 83.3 L 401.1 105.1 L 408.8 89.9 L 416.5 88.0 L 424.2 74.3 L 431.8 55.2 L 439.5 65.2 L 447.2 67.0 L 454.9 60.9 L 462.5 51.4 L 470.2 42.0 L 477.9 75.0 L 485.6 69.5 L 493.3 78.0 L 500.9 66.9 L 508.6 68.4 L 516.3 60.3 L 524.0 62.8 L 531.6 76.9 L 539.3 86.0 L 547.0 86.6 L 554.7 88.4 L 562.3 110.3 L 570.0 138.0 L 577.7 157.7 L 585.4 171.8 L 593.1 171.6 L 600.7 153.3 L 608.4 176.9 L 616.1 155.7 L 623.8 155.9 L 631.4 132.1 L 639.1 120.8 L 646.8 133.5 L 654.5 136.1 L 662.1 129.9 L 669.8 125.7 L 677.5 120.6 L 685.2 121.8 L 692.8 124.5 L 700.5 109.8 L 708.2 116.8 L 715.9 117.4 L 723.6 108.5 L 731.2 114.3 L 738.9 133.2 L 746.6 124.6 L 754.3 131.0 L 761.9 127.7 L 769.6 132.8 L 777.3 144.8 L 785.0 151.6 L 792.6 142.2 L 800.3 142.9 L 808.0 148.4" fill="none" stroke="#94a3b8" stroke-width="2"/><line x1="48" x2="808" y1="210" y2="210" stroke="#334155"/><text x="48" y="238" fill="#94a3b8" font-size="11">2025-12-09</text><text x="736" y="238" fill="#94a3b8" font-size="11">2026-05-04</text><circle cx="48.0" cy="195.9" r="5" fill="#22c55e"/><text x="55.0" y="188.9" fill="#22c55e" font-size="11">매수</text><circle cx="117.1" cy="169.5" r="5" fill="#60a5fa"/><text x="124.1" y="162.5" fill="#60a5fa" font-size="11">익절</text><circle cx="193.9" cy="162.3" r="5" fill="#22c55e"/><text x="200.9" y="155.3" fill="#22c55e" font-size="11">매수</text><circle cx="255.3" cy="130.3" r="5" fill="#60a5fa"/><text x="262.3" y="123.3" fill="#60a5fa" font-size="11">익절</text><circle cx="347.4" cy="108.9" r="5" fill="#22c55e"/><text x="354.4" y="101.9" fill="#22c55e" font-size="11">매수</text><circle cx="362.7" cy="78.5" r="5" fill="#60a5fa"/><text x="369.7" y="71.5" fill="#60a5fa" font-size="11">익절</text><circle cx="408.8" cy="88.0" r="5" fill="#22c55e"/><text x="415.8" y="81.0" fill="#22c55e" font-size="11">매수</text><circle cx="431.8" cy="58.5" r="5" fill="#60a5fa"/><text x="438.8" y="51.5" fill="#60a5fa" font-size="11">익절</text><circle cx="516.3" cy="52.2" r="5" fill="#22c55e"/><text x="523.3" y="45.2" fill="#22c55e" font-size="11">매수</text><circle cx="531.6" cy="74.8" r="5" fill="#ef4444"/><text x="538.6" y="67.8" fill="#ef4444" font-size="11">손절</text><circle cx="646.8" cy="126.9" r="5" fill="#22c55e"/><text x="653.8" y="119.9" fill="#22c55e" font-size="11">매수</text></svg><details><summary>거래 로그 원본 보기</summary><pre>[
+  {
+    "date": "2025-12-09",
+    "type": "매수",
+    "price": 388.06,
+    "reason": "FVG 진입구간 터치 + 시장점수 통과"
+  },
+  {
+    "date": "2025-12-22",
+    "type": "익절",
+    "price": 405.5512,
+    "reason": "익절"
+  },
+  {
+    "date": "2026-01-07",
+    "type": "매수",
+    "price": 410.31,
+    "reason": "FVG 진입구간 터치 + 시장점수 통과"
+  },
+  {
+    "date": "2026-01-20",
+    "type": "익절",
+    "price": 431.535,
+    "reason": "익절"
+  },
+  {
+    "date": "2026-02-05",
+    "type": "매수",
+    "price": 445.71,
+    "reason": "FVG 진입구간 터치 + 시장점수 통과"
+  },
+  {
+    "date": "2026-02-09",
+    "type": "익절",
+    "price": 465.8062,
+    "reason": "익절"
+  },
+  {
+    "date": "2026-02-18",
+    "type": "매수",
+    "price": 459.52,
+    "reason": "FVG 진입구간 터치 + 시장점수 통과"
+  },
+  {
+    "date": "2026-02-23",
+    "type": "익절",
+    "price": 479.0922,
+    "reason": "익절"
+  },
+  {
+    "date": "2026-03-10",
+    "type": "매수",
+    "price": 483.28,
+    "reason": "FVG 진입구간 터치 + 시장점수 통과"
+  },
+  {
+    "date": "2026-03-12",
+    "type": "손절",
+    "price": 468.2734,
+    "reason": "손절"
+  },
+  {
+    "date": "2026-04-02",
+    "type": "매수",
+    "price": 433.76,
+    "reason": "FVG 진입구간 터치 + 시장점수 통과"
+  }
+]</pre></details></section><section class='panel'><h3>SCHD 실제 차트 + 매수/매도 지점</h3><p>거래 이벤트 7개 · 데이터 2025-12-09~2026-05-04</p><svg viewBox="0 0 860 260" class="chart"><rect width="860" height="260" rx="16" fill="#08111f"/><path d="M 48.0 196.9 L 55.7 184.6 L 63.4 181.1 L 71.0 181.1 L 78.7 178.5 L 86.4 187.8 L 94.1 183.6 L 101.7 187.4 L 109.4 188.1 L 117.1 183.0 L 124.8 185.5 L 132.4 181.7 L 140.1 182.4 L 147.8 183.0 L 155.5 182.7 L 163.2 189.0 L 170.8 179.5 L 178.5 173.8 L 186.2 168.1 L 193.9 174.1 L 201.5 157.6 L 209.2 153.5 L 216.9 155.1 L 224.6 151.2 L 232.2 137.9 L 239.9 138.2 L 247.6 142.4 L 255.3 148.7 L 262.9 134.4 L 270.6 133.8 L 278.3 134.7 L 286.0 133.5 L 293.7 127.4 L 301.3 129.7 L 309.0 127.4 L 316.7 113.1 L 324.4 107.4 L 332.0 91.6 L 339.7 75.4 L 347.4 76.6 L 355.1 60.8 L 362.7 64.6 L 370.4 66.2 L 378.1 55.4 L 385.8 64.9 L 393.5 56.3 L 401.1 62.4 L 408.8 57.9 L 416.5 57.6 L 424.2 56.3 L 431.8 58.9 L 439.5 55.4 L 447.2 59.5 L 454.9 59.5 L 462.5 51.2 L 470.2 48.4 L 477.9 57.0 L 485.6 58.5 L 493.3 67.4 L 500.9 71.6 L 508.6 75.1 L 516.3 78.9 L 524.0 75.7 L 531.6 81.4 L 539.3 82.0 L 547.0 79.8 L 554.7 77.3 L 562.3 89.0 L 570.0 88.7 L 577.7 95.1 L 585.4 90.3 L 593.1 87.1 L 600.7 82.1 L 608.4 79.5 L 616.1 85.3 L 623.8 84.0 L 631.4 77.6 L 639.1 83.0 L 646.8 81.4 L 654.5 78.9 L 662.1 81.4 L 669.8 71.8 L 677.5 69.3 L 685.2 81.4 L 692.8 75.7 L 700.5 76.6 L 708.2 78.6 L 715.9 73.4 L 723.6 65.8 L 731.2 66.4 L 738.9 68.0 L 746.6 67.0 L 754.3 53.9 L 761.9 61.0 L 769.6 63.2 L 777.3 57.4 L 785.0 53.0 L 792.6 33.1 L 800.3 39.8 L 808.0 47.2" fill="none" stroke="#94a3b8" stroke-width="2"/><line x1="48" x2="808" y1="210" y2="210" stroke="#334155"/><text x="48" y="238" fill="#94a3b8" font-size="11">2025-12-09</text><text x="736" y="238" fill="#94a3b8" font-size="11">2026-05-04</text><circle cx="86.4" cy="184.3" r="5" fill="#22c55e"/><text x="93.4" y="177.3" fill="#22c55e" font-size="11">매수</text><circle cx="232.2" cy="146.9" r="5" fill="#60a5fa"/><text x="239.2" y="139.9" fill="#60a5fa" font-size="11">익절</text><circle cx="255.3" cy="144.6" r="5" fill="#22c55e"/><text x="262.3" y="137.6" fill="#22c55e" font-size="11">매수</text><circle cx="324.4" cy="105.9" r="5" fill="#60a5fa"/><text x="331.4" y="98.9" fill="#60a5fa" font-size="11">익절</text><circle cx="500.9" cy="70.3" r="5" fill="#22c55e"/><text x="507.9" y="63.3" fill="#22c55e" font-size="11">매수</text><circle cx="577.7" cy="93.2" r="5" fill="#ef4444"/><text x="584.7" y="86.2" fill="#ef4444" font-size="11">손절</text><circle cx="808.0" cy="41.1" r="5" fill="#22c55e"/><text x="815.0" y="34.1" fill="#22c55e" font-size="11">매수</text></svg><details><summary>거래 로그 원본 보기</summary><pre>[
+  {
+    "date": "2025-12-16",
+    "type": "매수",
+    "price": 27.3487,
+    "reason": "FVG 진입구간 터치 + 시장점수 통과"
+  },
+  {
+    "date": "2026-01-14",
+    "type": "익절",
+    "price": 28.5157,
+    "reason": "익절"
+  },
+  {
+    "date": "2026-01-20",
+    "type": "매수",
+    "price": 28.5882,
+    "reason": "FVG 진입구간 터치 + 시장점수 통과"
+  },
+  {
+    "date": "2026-02-02",
+    "type": "익절",
+    "price": 29.7956,
+    "reason": "익절"
+  },
+  {
+    "date": "2026-03-06",
+    "type": "매수",
+    "price": 30.9086,
+    "reason": "FVG 진입구간 터치 + 시장점수 통과"
+  },
+  {
+    "date": "2026-03-20",
+    "type": "손절",
+    "price": 30.1932,
+    "reason": "손절"
+  },
+  {
+    "date": "2026-05-04",
+    "type": "매수",
+    "price": 31.82,
+    "reason": "FVG 진입구간 터치 + 시장점수 통과"
+  }
+]</pre></details></section><section class='panel'><h3>SPY 실제 차트 + 매수/매도 지점</h3><p>거래 이벤트 3개 · 데이터 2025-12-09~2026-05-04</p><svg viewBox="0 0 860 260" class="chart"><rect width="860" height="260" rx="16" fill="#08111f"/><path d="M 48.0 111.0 L 55.7 102.8 L 63.4 99.9 L 71.0 113.3 L 78.7 115.1 L 86.4 118.5 L 94.1 132.0 L 101.7 122.8 L 109.4 111.7 L 117.1 104.0 L 124.8 98.4 L 132.4 94.0 L 140.1 94.1 L 147.8 98.6 L 155.5 100.1 L 163.2 109.3 L 170.8 107.1 L 178.5 98.8 L 186.2 91.4 L 193.9 95.4 L 201.5 95.6 L 209.2 87.3 L 216.9 85.3 L 224.6 87.8 L 232.2 94.0 L 239.9 90.6 L 247.6 91.6 L 255.3 117.2 L 262.9 103.0 L 270.6 96.5 L 278.3 96.1 L 286.0 89.7 L 293.7 84.7 L 301.3 84.8 L 309.0 87.3 L 316.7 91.1 L 324.4 84.8 L 332.0 95.5 L 339.7 101.6 L 347.4 117.1 L 355.1 93.5 L 362.7 87.5 L 370.4 90.8 L 378.1 91.1 L 385.8 110.5 L 393.5 109.6 L 401.1 107.6 L 408.8 101.4 L 416.5 104.7 L 424.2 95.7 L 431.8 108.5 L 439.5 99.5 L 447.2 88.9 L 454.9 95.9 L 462.5 101.9 L 470.2 101.2 L 477.9 112.2 L 485.6 103.5 L 493.3 110.4 L 500.9 126.7 L 508.6 116.0 L 516.3 117.9 L 524.0 119.5 L 531.6 138.1 L 539.3 145.0 L 547.0 132.7 L 554.7 129.5 L 562.3 146.5 L 570.0 149.5 L 577.7 166.7 L 585.4 154.3 L 593.1 158.3 L 600.7 151.7 L 608.4 173.0 L 616.1 193.0 L 623.8 196.9 L 631.4 163.4 L 639.1 154.5 L 646.8 153.5 L 654.5 147.8 L 662.1 147.3 L 669.8 116.7 L 677.5 109.6 L 685.2 110.4 L 692.8 98.3 L 700.5 83.1 L 708.2 73.1 L 715.9 70.0 L 723.6 54.6 L 731.2 57.2 L 738.9 65.6 L 746.6 52.6 L 754.3 57.6 L 761.9 47.7 L 769.6 45.4 L 777.3 51.7 L 785.0 51.9 L 792.6 39.1 L 800.3 35.4 L 808.0 33.1" fill="none" stroke="#94a3b8" stroke-width="2"/><line x1="48" x2="808" y1="210" y2="210" stroke="#334155"/><text x="48" y="238" fill="#94a3b8" font-size="11">2025-12-09</text><text x="736" y="238" fill="#94a3b8" font-size="11">2026-05-04</text><circle cx="86.4" cy="115.6" r="5" fill="#22c55e"/><text x="93.4" y="108.6" fill="#22c55e" font-size="11">매수</text><circle cx="570.0" cy="147.8" r="5" fill="#ef4444"/><text x="577.0" y="140.8" fill="#ef4444" font-size="11">손절</text><circle cx="738.9" cy="61.9" r="5" fill="#22c55e"/><text x="745.9" y="54.9" fill="#22c55e" font-size="11">매수</text></svg><details><summary>거래 로그 원본 보기</summary><pre>[
+  {
+    "date": "2025-12-16",
+    "type": "매수",
+    "price": 676.6472,
+    "reason": "FVG 진입구간 터치 + 시장점수 통과"
+  },
+  {
+    "date": "2026-03-19",
+    "type": "손절",
+    "price": 658.9339,
+    "reason": "손절"
+  },
+  {
+    "date": "2026-04-21",
+    "type": "매수",
+    "price": 706.14,
+    "reason": "FVG 진입구간 터치 + 시장점수 통과"
+  }
+]</pre></details></section><section class='panel'><h3>QQQ 실제 차트 + 매수/매도 지점</h3><p>거래 이벤트 7개 · 데이터 2025-12-09~2026-05-04</p><svg viewBox="0 0 860 260" class="chart"><rect width="860" height="260" rx="16" fill="#08111f"/><path d="M 48.0 106.7 L 55.7 103.1 L 63.4 106.0 L 71.0 122.5 L 78.7 126.7 L 86.4 125.0 L 94.1 140.7 L 101.7 128.7 L 109.4 117.7 L 117.1 113.6 L 124.8 109.6 L 132.4 107.1 L 140.1 107.2 L 147.8 111.3 L 155.5 113.3 L 163.2 120.4 L 170.8 122.1 L 178.5 115.3 L 186.2 107.8 L 193.9 107.0 L 201.5 111.9 L 209.2 103.4 L 216.9 102.6 L 224.6 103.9 L 232.2 113.2 L 239.9 110.1 L 247.6 110.8 L 255.3 129.1 L 262.9 117.7 L 270.6 111.5 L 278.3 108.8 L 286.0 105.0 L 293.7 97.2 L 301.3 94.3 L 309.0 99.5 L 316.7 110.0 L 324.4 104.1 L 332.0 117.4 L 339.7 132.2 L 347.4 144.3 L 355.1 126.9 L 362.7 120.4 L 370.4 124.3 L 378.1 122.1 L 385.8 139.3 L 393.5 137.5 L 401.1 138.4 L 408.8 132.2 L 416.5 135.4 L 424.2 128.0 L 431.8 138.2 L 439.5 129.3 L 447.2 117.1 L 454.9 127.4 L 462.5 130.1 L 470.2 129.0 L 477.9 138.0 L 485.6 125.3 L 493.3 127.9 L 500.9 140.5 L 508.6 129.5 L 516.3 129.5 L 524.0 129.6 L 531.6 144.0 L 539.3 148.9 L 547.0 139.7 L 554.7 135.6 L 562.3 147.2 L 570.0 149.8 L 577.7 165.0 L 585.4 155.8 L 593.1 161.3 L 600.7 156.0 L 608.4 175.4 L 616.1 190.9 L 623.8 196.9 L 631.4 170.7 L 639.1 160.9 L 646.8 159.9 L 654.5 155.1 L 662.1 154.9 L 669.8 130.7 L 677.5 125.0 L 685.2 123.8 L 692.8 115.1 L 700.5 99.6 L 708.2 87.4 L 715.9 83.1 L 723.6 71.5 L 731.2 74.4 L 738.9 77.8 L 746.6 62.9 L 754.3 68.0 L 761.9 50.7 L 769.6 50.3 L 777.3 59.5 L 785.0 53.9 L 792.6 45.4 L 800.3 36.5 L 808.0 33.1" fill="none" stroke="#94a3b8" stroke-width="2"/><line x1="48" x2="808" y1="210" y2="210" stroke="#334155"/><text x="48" y="238" fill="#94a3b8" font-size="11">2025-12-09</text><text x="736" y="238" fill="#94a3b8" font-size="11">2026-05-04</text><circle cx="71.0" cy="120.0" r="5" fill="#22c55e"/><text x="78.0" y="113.0" fill="#22c55e" font-size="11">매수</text><circle cx="347.4" cy="144.0" r="5" fill="#ef4444"/><text x="354.4" y="137.0" fill="#ef4444" font-size="11">손절</text><circle cx="454.9" cy="125.0" r="5" fill="#22c55e"/><text x="461.9" y="118.0" fill="#22c55e" font-size="11">매수</text><circle cx="477.9" cy="145.9" r="5" fill="#ef4444"/><text x="484.9" y="138.9" fill="#ef4444" font-size="11">손절</text><circle cx="485.6" cy="125.0" r="5" fill="#22c55e"/><text x="492.6" y="118.0" fill="#22c55e" font-size="11">매수</text><circle cx="508.6" cy="145.9" r="5" fill="#ef4444"/><text x="515.6" y="138.9" fill="#ef4444" font-size="11">손절</text><circle cx="777.3" cy="55.2" r="5" fill="#22c55e"/><text x="784.3" y="48.2" fill="#22c55e" font-size="11">매수</text></svg><details><summary>거래 로그 원본 보기</summary><pre>[
+  {
+    "date": "2025-12-12",
+    "type": "매수",
+    "price": 613.8541,
+    "reason": "FVG 진입구간 터치 + 시장점수 통과"
+  },
+  {
+    "date": "2026-02-05",
+    "type": "손절",
+    "price": 596.5331,
+    "reason": "손절"
+  },
+  {
+    "date": "2026-02-26",
+    "type": "매수",
+    "price": 610.2305,
+    "reason": "FVG 진입구간 터치 + 시장점수 통과"
+  },
+  {
+    "date": "2026-03-03",
+    "type": "손절",
+    "price": 595.0994,
+    "reason": "손절"
+  },
+  {
+    "date": "2026-03-04",
+    "type": "매수",
+    "price": 610.2305,
+    "reason": "FVG 진입구간 터치 + 시장점수 통과"
+  },
+  {
+    "date": "2026-03-09",
+    "type": "손절",
+    "price": 595.0994,
+    "reason": "손절"
+  },
+  {
+    "date": "2026-04-28",
+    "type": "매수",
+    "price": 660.69,
+    "reason": "FVG 진입구간 터치 + 시장점수 통과"
+  }
+]</pre></details></section><section class='panel'><h2>3. 데이터 기반 증명 방식</h2><ul><li>가격 데이터: <code>yfinance</code> adjusted daily OHLC/Close</li><li>단타 이벤트: 각 일봉의 high/low가 entry/target/stop을 실제로 터치했는지 검사</li><li>동일 일봉에서 목표/손절 동시 가능 시 보수적으로 손절 우선</li><li>장기 ETF: <code>run_etf_allocation_backtest()</code> 결정론적 배분 엔진 사용</li><li>원본 JSON: <code>artifacts/dashboard-pilot-20260430/strategy_evidence_report.json</code></li></ul></section></main></body></html>

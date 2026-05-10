@@ -136,9 +136,14 @@ append-only snapshot 방식이라 같은 `signal_id`의 최신 상태만 조회�
 ## 다음 자동화 대상
 
 1. 저장된 `strategy_spec`와 가격 데이터를 묶어 다종목 walk-forward 결과 생성
-2. 점수판 factor별 성과 분해
+2. 셀프 피드백 루프 운영
+   - 사용자가 반복 횟수 N을 지정하면 `StrategySpec → 일봉 백테스트 → pre-live 검증 → Quant Strategy Analyst 수정`을 N회 반복
+   - 각 회차의 전략, 성과, 실패 사유, 수정 피드백, best iteration을 `strategy_self_feedback_loops`에 저장
+   - API: `GET /api/strategy-self-feedback`, `GET /api/strategy-self-feedback/{loop_id}`
+   - 이 루프도 `live_capital_allowed=False`를 유지하며, 최종 후보는 paper trading 검토 대상으로만 표시
+3. 점수판 factor별 성과 분해
    - 시장 공통 리스크가 나쁠 때 매수한 경우의 성과
    - 진입 타이밍 점수가 양수/음수일 때 성과
    - 방향성 점수와 실제 forward return 상관관계
-3. Paper trading ledger를 매일 실행해 새 OHLC로 fill/PnL 자동 업데이트
-4. 통과 전략만 dashboard에 `paper trading 후보`로 표시하고, 실전 투입은 Gate B/C 완료 전까지 계속 차단
+4. Paper trading ledger를 매일 실행해 새 OHLC로 fill/PnL 자동 업데이트
+5. 통과 전략만 dashboard에 `paper trading 후보`로 표시하고, 실전 투입은 Gate B/C 완료 전까지 계속 차단

@@ -200,6 +200,108 @@ def test_backtest_marks_unavailable_without_valid_price_timing_levels():
 
 
 @pytest.mark.unit
+def test_dashboard_home_renders_return_leaderboard(tmp_path, sample_record, monkeypatch):
+    from tradingagents.dashboard import app as dashboard_app
+
+    def fake_get_price_chart(ticker, trade_date, lookback_days=180):
+        return {
+            "available": True,
+            "ticker": ticker,
+            "currency": "KRW",
+            "points": [
+                {"date": "2026-01-01", "open": 100.0, "high": 101.0, "low": 99.0, "close": 100.0},
+                {"date": "2026-01-02", "open": 101.0, "high": 103.0, "low": 98.0, "close": 102.0},
+                {"date": "2026-01-03", "open": 102.0, "high": 112.0, "low": 101.0, "close": 110.0},
+            ],
+            "latest_close": 110.0,
+            "first_close": 100.0,
+            "change": 10.0,
+            "change_percent": 10.0,
+            "min_close": 100.0,
+            "max_close": 110.0,
+            "start_date": "2026-01-01",
+            "end_date": "2026-01-03",
+            "positive": True,
+            "path": "M 0 0 L 720 20",
+            "area_path": "M 0 0 L 720 20 L 720 220 L 0 220 Z",
+        }
+
+    monkeypatch.setattr(dashboard_app, "get_price_chart", fake_get_price_chart)
+    record = dict(sample_record)
+    record["ticker"] = "005930.KS"
+    reports = dict(record["reports"])
+    reports["quant_strategy_report"] = "진입 99-101 KRW, 익절 110 KRW, 손절 94 KRW"
+    record["reports"] = reports
+    record.pop("strategy_spec", None)
+    repository = AnalysisRepository(tmp_path)
+    repository.save(record)
+    client = TestClient(create_dashboard_app(tmp_path))
+
+    response = client.get("/dashboards/kospi?latest_only=1")
+
+    assert response.status_code == 200
+    assert "전략 성과 점검" in response.text
+    assert "수익률 리더보드" not in response.text
+    assert "삼성전자" in response.text
+    assert "삼성전자 (005930.KS)" not in response.text
+    assert "+8.91%" in response.text
+    assert "+8,910,000" in response.text
+    assert "벤치마크 +10.00%" in response.text
+    assert "참고용" in response.text
+
+
+@pytest.mark.unit
+def test_dashboard_detail_renders_return_summary_near_top(tmp_path, sample_record, monkeypatch):
+    from tradingagents.dashboard import app as dashboard_app
+
+    def fake_get_price_chart(ticker, trade_date, lookback_days=180):
+        return {
+            "available": True,
+            "ticker": ticker,
+            "currency": "KRW",
+            "points": [
+                {"date": "2026-01-01", "open": 100.0, "high": 101.0, "low": 99.0, "close": 100.0},
+                {"date": "2026-01-02", "open": 101.0, "high": 103.0, "low": 98.0, "close": 102.0},
+                {"date": "2026-01-03", "open": 102.0, "high": 112.0, "low": 101.0, "close": 110.0},
+            ],
+            "latest_close": 110.0,
+            "first_close": 100.0,
+            "change": 10.0,
+            "change_percent": 10.0,
+            "min_close": 100.0,
+            "max_close": 110.0,
+            "start_date": "2026-01-01",
+            "end_date": "2026-01-03",
+            "positive": True,
+            "path": "M 0 0 L 720 20",
+            "area_path": "M 0 0 L 720 20 L 720 220 L 0 220 Z",
+        }
+
+    monkeypatch.setattr(dashboard_app, "get_price_chart", fake_get_price_chart)
+    record = dict(sample_record)
+    record["ticker"] = "005930.KS"
+    reports = dict(record["reports"])
+    reports["quant_strategy_report"] = "진입 99-101 KRW, 익절 110 KRW, 손절 94 KRW"
+    record["reports"] = reports
+    record.pop("strategy_spec", None)
+    repository = AnalysisRepository(tmp_path)
+    stored = repository.save(record)
+    client = TestClient(create_dashboard_app(tmp_path))
+
+    response = client.get(f"/runs/{stored['run_id']}")
+
+    assert response.status_code == 200
+    assert "수익률 요약" in response.text
+    assert "전략 수익률" in response.text
+    assert "1억원 기준 손익" in response.text
+    assert "+8,910,000" in response.text
+    assert "단순 보유 수익률" in response.text
+    assert "초과수익" in response.text
+    assert "표본 1회 · 참고용" in response.text
+    assert response.text.index("수익률 요약") < response.text.index("판단 점수판")
+
+
+@pytest.mark.unit
 def test_dashboard_detail_renders_backtest_panel_and_api(tmp_path, sample_record, monkeypatch):
     from tradingagents.dashboard import app as dashboard_app
 
@@ -291,7 +393,7 @@ def test_dashboard_detail_renders_pre_live_validation_and_api(tmp_path, sample_r
 
     assert response.status_code == 200
     assert "실전 투입 전 검증" in response.text
-    assert "검증 실패" in response.text
+    assert "재분석 필요" in response.text
     assert "실전 투입 보류" in response.text
     assert "표본 부족" in response.text
     assert "미래 수익을 보장하지 않습니다" in response.text
@@ -300,9 +402,12 @@ def test_dashboard_detail_renders_pre_live_validation_and_api(tmp_path, sample_r
     assert api_response.status_code == 200
     payload = api_response.json()
     assert payload["available"] is True
-    assert payload["status_label"] == "검증 실패"
+    assert payload["status_label"] == "재분석 필요"
     assert payload["live_capital_allowed"] is False
     assert "표본 부족" in payload["failure_reasons"]
+    assert payload["reanalysis_required"] is True
+    assert payload["reanalysis_request"]["agent"] == "quant_strategy_analyst"
+    assert "전략 재조정" in response.text
 
 
 @pytest.mark.unit
@@ -404,3 +509,134 @@ def test_dashboard_detail_renders_strategy_execution_replay_and_api(tmp_path, sa
     assert api_response.status_code == 200
     assert api_response.json()["pnl"] == -4_080_000
     assert api_response.json()["events"][2]["type"] == "reanalysis_required"
+
+
+@pytest.mark.unit
+def test_walk_forward_backtest_switches_to_next_saved_strategy_after_reanalysis():
+    from tradingagents.dashboard.walk_forward import build_walk_forward_backtest
+
+    records = [
+        {
+            "run_id": "aaa-2026-04-01",
+            "ticker": "AAA.KS",
+            "trade_date": "2026-04-01",
+            "strategy_spec": {
+                "strategy_id": "AAA.KS-2026-04-01-price-timing",
+                "ticker": "AAA.KS",
+                "trade_date": "2026-04-01",
+                "entry": {"type": "price_zone", "low": 100.0, "high": 100.0},
+                "take_profit": {"type": "fixed_price", "price": 120.0},
+                "stop_loss": {"type": "fixed_price", "price": 90.0},
+                "currency": "KRW",
+                "reanalysis_triggers": [{"type": "price_below", "level": 90.0, "reason": "손절가 이탈"}],
+            },
+        },
+        {
+            "run_id": "aaa-2026-04-04",
+            "ticker": "AAA.KS",
+            "trade_date": "2026-04-04",
+            "strategy_spec": {
+                "strategy_id": "AAA.KS-2026-04-04-price-timing",
+                "ticker": "AAA.KS",
+                "trade_date": "2026-04-04",
+                "entry": {"type": "price_zone", "low": 80.0, "high": 80.0},
+                "take_profit": {"type": "fixed_price", "price": 100.0},
+                "stop_loss": {"type": "fixed_price", "price": 70.0},
+                "currency": "KRW",
+                "reanalysis_triggers": [{"type": "price_below", "level": 70.0, "reason": "손절가 이탈"}],
+            },
+        },
+    ]
+    chart = {
+        "available": True,
+        "currency": "KRW",
+        "points": [
+            {"date": "2026-04-01", "open": 101.0, "high": 102.0, "low": 100.0, "close": 101.0},
+            {"date": "2026-04-02", "open": 95.0, "high": 96.0, "low": 89.0, "close": 90.0},
+            {"date": "2026-04-03", "open": 91.0, "high": 92.0, "low": 88.0, "close": 89.0},
+            {"date": "2026-04-04", "open": 80.0, "high": 82.0, "low": 79.0, "close": 81.0},
+            {"date": "2026-04-05", "open": 98.0, "high": 101.0, "low": 97.0, "close": 100.0},
+        ],
+    }
+
+    result = build_walk_forward_backtest(records, chart, start_date="2026-04-01", end_date="2026-04-05", initial_capital=100_000_000)
+
+    assert result["available"] is True
+    assert result["final_equity"] == 112_500_000
+    assert result["pnl"] == 12_500_000
+    assert result["return_percent"] == 12.5
+    assert result["benchmark_return_percent"] == -0.99
+    assert result["strategy_version_count"] == 2
+    assert result["trade_count"] == 2
+    assert result["reanalysis_count"] == 1
+    assert [event["type"] for event in result["events"]] == [
+        "strategy_selected",
+        "buy",
+        "sell",
+        "reanalysis_required",
+        "strategy_selected",
+        "buy",
+        "sell",
+    ]
+    assert result["events"][3]["next_strategy_run_id"] == "aaa-2026-04-04"
+    assert result["trades"][0]["exit_reason"] == "stop_loss"
+    assert result["trades"][1]["exit_reason"] == "take_profit"
+
+
+@pytest.mark.unit
+def test_dashboard_hides_walk_forward_form_and_blocks_public_api(tmp_path, sample_record, monkeypatch):
+    from tradingagents.dashboard import app as dashboard_app
+
+    def spec(run_id, trade_date, entry, target, stop):
+        return {
+            "run_id": run_id,
+            "ticker": "AAA.KS",
+            "trade_date": trade_date,
+            "generated_at": f"{trade_date}T00:00:00+09:00",
+            "strategy_spec": {
+                "strategy_id": f"AAA.KS-{trade_date}-price-timing",
+                "ticker": "AAA.KS",
+                "trade_date": trade_date,
+                "entry": {"type": "price_zone", "low": entry, "high": entry},
+                "take_profit": {"type": "fixed_price", "price": target},
+                "stop_loss": {"type": "fixed_price", "price": stop},
+                "currency": "KRW",
+                "reanalysis_triggers": [{"type": "price_below", "level": stop, "reason": "손절가 이탈"}],
+            },
+        }
+
+    def fake_get_price_chart(ticker, trade_date, lookback_days=180):
+        return {
+            "available": True,
+            "currency": "KRW",
+            "points": [
+                {"date": "2026-04-01", "open": 101.0, "high": 102.0, "low": 100.0, "close": 101.0},
+                {"date": "2026-04-02", "open": 95.0, "high": 96.0, "low": 89.0, "close": 90.0},
+                {"date": "2026-04-03", "open": 91.0, "high": 92.0, "low": 88.0, "close": 89.0},
+                {"date": "2026-04-04", "open": 80.0, "high": 82.0, "low": 79.0, "close": 81.0},
+                {"date": "2026-04-05", "open": 98.0, "high": 101.0, "low": 97.0, "close": 100.0},
+            ],
+        }
+
+    monkeypatch.setattr(dashboard_app, "get_price_chart", fake_get_price_chart)
+    repository = AnalysisRepository(tmp_path)
+    base = dict(sample_record)
+    base.update(spec("aaa-2026-04-01", "2026-04-01", 100.0, 120.0, 90.0))
+    repository.save(base)
+    second = dict(sample_record)
+    second.update(spec("aaa-2026-04-04", "2026-04-04", 80.0, 100.0, 70.0))
+    repository.save(second)
+    client = TestClient(create_dashboard_app(tmp_path))
+
+    home = client.get("/?market=KR")
+    response = client.get("/api/walk-forward-backtest?ticker=AAA.KS&start_date=2026-04-01&end_date=2026-04-05&initial_capital=100000000")
+
+    assert home.status_code == 200
+    assert "워크포워드 백테스트" not in home.text
+    assert "전략 재수립 조건과 매수·매도 조건" not in home.text
+    assert "/api/walk-forward-backtest" not in home.text
+    assert "initial_capital" not in home.text
+    assert "수수료 bps" not in home.text
+    assert "슬리피지 bps" not in home.text
+    assert response.status_code == 403
+    assert "internal agent workflow" in response.text

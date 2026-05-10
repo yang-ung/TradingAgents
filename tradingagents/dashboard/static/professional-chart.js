@@ -58,9 +58,9 @@
     candleSeries.setData(candles);
 
     const maConfig = [
-      ['ma5', '#facc15', 'MA5'],
-      ['ma20', '#60a5fa', 'MA20'],
-      ['ma60', '#c084fc', 'MA60'],
+      ['ma5', '#facc15', '5일 이동평균'],
+      ['ma20', '#60a5fa', '20일 이동평균'],
+      ['ma60', '#c084fc', '60일 이동평균'],
     ];
     for (const [key, color, title] of maConfig) {
       const data = payload.moving_averages?.[key];

@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ETF 전략 최근 1년 백테스트 리포트</title>
+  <style>
+    :root { color-scheme: dark; --bg:#08111f; --panel:#111d2e; --text:#e9f1ff; --muted:#9fb0c8; --line:#263850; --green:#4ade80; --red:#fb7185; --blue:#60a5fa; --yellow:#facc15; }
+    body{margin:0;background:linear-gradient(180deg,#07111f,#0b1220 45%,#09101c);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--text);}
+    main{max-width:1180px;margin:0 auto;padding:32px 20px 56px;}
+    .hero{border:1px solid var(--line);background:rgba(17,29,46,.86);border-radius:24px;padding:28px;box-shadow:0 20px 60px rgba(0,0,0,.28)}
+    h1{margin:0 0 10px;font-size:30px} h2{margin-top:34px} p,li{line-height:1.65;color:#d6e1f3}.muted{color:var(--muted)}
+    .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin:22px 0}.card{background:rgba(96,165,250,.08);border:1px solid var(--line);border-radius:18px;padding:18px}.card strong{display:block;font-size:24px;margin-top:8px}.good{color:var(--green)}.bad{color:var(--red)}.warn{color:var(--yellow)}
+    table{width:100%;border-collapse:collapse;background:rgba(17,29,46,.72);border:1px solid var(--line);border-radius:18px;overflow:hidden}th,td{padding:13px 12px;border-bottom:1px solid var(--line);text-align:right}th:first-child,td:first-child{text-align:left}th{color:#bfd0e8;background:rgba(255,255,255,.04)}tr:last-child td{border-bottom:0}.rank1{background:rgba(74,222,128,.06)}
+    code{background:#0f1a2b;border:1px solid #24354d;padding:2px 6px;border-radius:6px}.note{border-left:4px solid var(--yellow);padding:12px 16px;background:rgba(250,204,21,.08);border-radius:12px}.danger{border-left-color:var(--red);background:rgba(251,113,133,.08)}
+  </style>
+</head>
+<body><main>
+  <section class="hero">
+    <h1>ETF 전략 최근 1년 백테스트 리포트</h1>
+    <p class="muted">기간: 2025-05-01 ~ 2026-05-01 · 월 100만원 납입 · 월 1회 리밸런싱 · SPY/QQQ/SCHD/IEF/GLD/BIL 프록시 · 비용/세금/환율 미반영</p>
+    <div class="cards">
+      <div class="card">수익률 1위<strong class="good">단순 DCA 70/30</strong><span class="muted">+12.77%, 수익 +1,659,681원</span></div>
+      <div class="card">방어/수익 균형<strong>상시분산</strong><span class="muted">+11.82%, MDD -6.77%</span></div>
+      <div class="card">최대낙폭 발생일<strong class="warn">2026-03-30</strong><span class="muted">SPY -8.88%, QQQ -11.96% 구간</span></div>
+      <div class="card">현재 결론<strong class="bad">Adaptive v1 수정 필요</strong><span class="muted">방어 신호가 너무 민감함</span></div>
+    </div>
+  </section>
+
+  <h2>기초 자산 최근 1년 흐름</h2>
+  <table><thead><tr><th>자산</th><th>수익률</th><th>기간 내 MDD</th><th>MDD 발생일</th></tr></thead><tbody>
+    <tr><td>S&P500 / SPY</td><td class="good">+30.52%</td><td class="bad">-8.88%</td><td>2026-03-30</td></tr>
+    <tr><td>나스닥100 / QQQ</td><td class="good">+40.64%</td><td class="bad">-11.96%</td><td>2026-03-30</td></tr>
+    <tr><td>배당/퀄리티 / SCHD</td><td class="good">+28.71%</td><td class="bad">-4.61%</td><td>2026-03-20</td></tr>
+    <tr><td>미국중기채 / IEF</td><td class="good">+3.23%</td><td class="bad">-3.19%</td><td>2026-03-26</td></tr>
+    <tr><td>금 / GLD</td><td class="good">+42.26%</td><td class="bad">-19.21%</td><td>2026-03-26</td></tr>
+    <tr><td>현금성 / BIL</td><td class="good">+3.95%</td><td>-</td><td>-</td></tr>
+  </tbody></table>
+
+  <h2>월 적립 계좌 기준 전략 성과</h2>
+  <table><thead><tr><th>순위</th><th>전략</th><th>최종금액</th><th>수익금</th><th>수익률</th><th>계좌 MDD</th></tr></thead><tbody>
+    <tr class="rank1"><td>1</td><td>단순 DCA 70% S&P500 / 30% 나스닥</td><td>14,659,681원</td><td class="good">+1,659,681원</td><td class="good">+12.77%</td><td class="bad">-7.80%</td></tr>
+    <tr><td>2</td><td>상시분산</td><td>14,536,987원</td><td class="good">+1,536,987원</td><td class="good">+11.82%</td><td class="bad">-6.77%</td></tr>
+    <tr><td>3</td><td>듀얼 모멘텀</td><td>14,486,718원</td><td class="good">+1,486,718원</td><td class="good">+11.44%</td><td class="bad">-11.04%</td></tr>
+    <tr><td>4</td><td>하락장 가중매수</td><td>14,023,722원</td><td class="good">+1,023,722원</td><td class="good">+7.87%</td><td class="bad">-6.77%</td></tr>
+    <tr><td>5</td><td>Adaptive Core v1</td><td>13,808,035원</td><td class="good">+808,035원</td><td class="good">+6.22%</td><td class="bad">-7.08%</td></tr>
+    <tr><td>6</td><td>10개월 추세방어</td><td>13,784,462원</td><td class="good">+784,462원</td><td class="good">+6.03%</td><td class="bad">-7.08%</td></tr>
+  </tbody></table>
+
+  <h2>왜 하락이 컸는데도 1번이 1위인가?</h2>
+  <p>기간 중 전쟁/유가 리스크로 3월 말 낙폭이 컸지만, 이 백테스트의 종료일 기준으로는 S&P500과 나스닥100이 이미 크게 회복한 상태다. 그래서 가장 높은 주식 노출을 유지한 단순 DCA가 최종 수익률에서는 1위로 나왔다.</p>
+  <p>다만 이것은 “1번이 항상 좋다”가 아니다. 최근 1년은 결과적으로 <strong>하락 후 회복한 강한 상승장</strong>이었기 때문에 방어 전략이 수익률을 포기한 구간이다.</p>
+
+  <h2>검증상 주의점</h2>
+  <div class="note danger">
+    <p><strong>이전 응답의 표현 중 보정할 부분:</strong> 월 적립 계좌 MDD는 추가 납입금 때문에 실제 전략 자체 낙폭보다 작게 보일 수 있다. 그래서 위 표는 “월 적립 계좌 관점”이고, 전략 순수 변동성은 별도 TWR/일별 리턴 기준으로 추가 검증해야 한다.</p>
+  </div>
+  <p>현재 결론: 단순 DCA는 최근 1년 수익률 벤치마크로 강했다. 하지만 실전 후보는 <strong>상시분산</strong>과 <strong>Adaptive Core v2</strong>를 중심으로 재설계하는 게 맞다. Adaptive v1은 4월 방어 전환이 너무 빨라 상승장 수익을 놓쳤다.</p>
+
+  <h2>다음 개선 방향</h2>
+  <ul>
+    <li>Adaptive Core v2: 1개월 이평선 이탈이 아니라 2개월 연속 이탈 또는 -10% 이상 하락 조건 추가</li>
+    <li>월 적립형과 거치식/TWR 성과를 분리 표시</li>
+    <li>비용, 세금, 환율, 한국 상장 ETF 대체상품을 반영</li>
+    <li>최근 1년뿐 아니라 3년/5년/10년 및 2020·2022·전쟁/유가 쇼크 구간 별도 검증</li>
+  </ul>
+</main></body></html>

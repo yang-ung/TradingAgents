@@ -9,7 +9,7 @@
       body { margin: 0; min-height: 100vh; background: radial-gradient(circle at 20% -10%, rgba(113,112,255,0.22), transparent 32rem), linear-gradient(180deg, #08090a 0%, #0f1011 100%); color: #f7f8f8; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif; }
       .page { max-width: 1440px; margin: 0 auto; padding: 28px 24px 80px; }
     </style>
-    <link rel="stylesheet" href="{{ url_for('static', path='/dashboard.css') }}" />
+    <link rel="stylesheet" href="/static/dashboard.css?v=20260506-sqlite-css" />
   </head>
   <body>
     <main class="page stock-workspace">
@@ -49,6 +49,25 @@
           </dl>
         </aside>
       </header>
+
+      {% if return_summary.available %}
+      <section class="panel return-summary-panel" id="return-summary">
+        <div class="panel-header split">
+          <div>
+            <p class="eyebrow">과거 적용 시뮬레이션</p>
+            <h2>수익률 요약</h2>
+          </div>
+          <span class="pill tone-info">표본 {{ return_summary.trade_count }}회 · {{ return_summary.sample_status_label }}</span>
+        </div>
+        <div class="return-summary-grid" aria-label="수익률 요약">
+          <div><span>전략 수익률</span><strong class="{{ 'positive' if return_summary.strategy_return_percent >= 0 else 'negative' }}">{{ return_summary.strategy_return_label }}</strong></div>
+          <div><span>1억원 기준 손익</span><strong class="{{ 'positive' if return_summary.pnl >= 0 else 'negative' }}">{% if return_summary.pnl >= 0 %}+{% endif %}{{ return_summary.pnl_label }}</strong></div>
+          <div><span>단순 보유 수익률</span><strong class="{{ 'positive' if return_summary.benchmark_return_percent >= 0 else 'negative' }}">{{ return_summary.benchmark_return_label }}</strong></div>
+          <div><span>초과수익</span><strong class="{{ 'positive' if return_summary.excess_return_percent >= 0 else 'negative' }}">{{ return_summary.excess_return_label }}</strong></div>
+        </div>
+        <p class="backtest-disclaimer">{{ return_summary.start_date }} ~ {{ return_summary.end_date }} 전체 구간 기준입니다. 현재 리포트 규칙을 과거 가격에 적용한 참고용 시뮬레이션이며 미래 수익을 보장하지 않습니다.</p>
+      </section>
+      {% endif %}
 
       {% if scorecard.available %}
       <section class="panel scorecard-panel" id="scorecard">
@@ -160,9 +179,9 @@
         {% if chart.available %}
         <div class="chart-toolbar" aria-label="차트 보조지표">
           <span class="toolbar-label">캔들</span>
-          <span class="legend-dot ma5"></span><span>MA5</span>
-          <span class="legend-dot ma20"></span><span>MA20</span>
-          <span class="legend-dot ma60"></span><span>MA60</span>
+          <span class="legend-dot ma5"></span><span>5일 이동평균</span>
+          <span class="legend-dot ma20"></span><span>20일 이동평균</span>
+          <span class="legend-dot ma60"></span><span>60일 이동평균</span>
           <span class="toolbar-spacer"></span>
           <span class="chart-license">데이터 소스: {{ chart.data_source or '가격 데이터 제공처' }}</span>
         </div>
@@ -190,7 +209,7 @@
         </div>
         <script id="chart-payload" type="application/json">{{ chart|tojson }}</script>
         <script src="https://unpkg.com/lightweight-charts@5.2.0/dist/lightweight-charts.standalone.production.js" defer></script>
-        <script src="{{ url_for('static', path='/professional-chart.js') }}" defer></script>
+        <script src="/static/professional-chart.js?v=20260507-indicator-ko" defer></script>
         {% else %}
         <div class="empty-state">
           <strong>차트 데이터를 가져오지 못했습니다.</strong>
@@ -205,7 +224,7 @@
             <p class="eyebrow">실전 투입 전 검증</p>
             <h2>Pre-live 검증 Gate</h2>
           </div>
-          <span class="pill {{ 'tone-positive' if pre_live_validation.paper_trading_candidate else 'tone-negative' }}">{{ pre_live_validation.status_label }}</span>
+          <span class="pill {{ 'tone-positive' if pre_live_validation.paper_trading_candidate else ('tone-warning' if pre_live_validation.reanalysis_required else 'tone-negative') }}">{{ pre_live_validation.status_label }}</span>
         </div>
         {% if pre_live_validation.available %}
         <div class="backtest-levels" aria-label="실전 투입 전 검증 요약">
@@ -222,6 +241,29 @@
         <div class="trade-log">
           <h3>탈락/보류 사유</h3>
           <ul>{% for reason in pre_live_validation.failure_reasons %}<li><span>{{ reason }}</span><em>실전 투입 보류</em></li>{% endfor %}</ul>
+        </div>
+        {% endif %}
+        {% if pre_live_validation.reanalysis_required and pre_live_validation.reanalysis_request %}
+        <div class="trade-log reanalysis-request">
+          <h3>전략 재조정 에이전트 호출 필요</h3>
+          <ul>
+            {% for reason in pre_live_validation.reanalysis_request.reasons %}
+            <li><span>{{ reason }}</span><em>{{ pre_live_validation.reanalysis_request.agent }}</em></li>
+            {% endfor %}
+          </ul>
+        </div>
+        {% endif %}
+        {% if reanalysis_execution %}
+        <div class="trade-log reanalysis-execution">
+          <h3>자동 재분석 실행 결과</h3>
+          <ul>
+            {% for attempt in reanalysis_execution.attempts %}
+            <li>
+              <span>{{ attempt.attempt }}차 재분석 · {{ reanalysis_execution.agent }}</span>
+              <em>{% if attempt.pre_live_validation and attempt.pre_live_validation.paper_trading_candidate %}paper trading 후보{% elif attempt.pre_live_validation and attempt.pre_live_validation.reanalysis_required %}추가 재분석 필요{% else %}{{ attempt.status }}{% endif %}</em>
+            </li>
+            {% endfor %}
+          </ul>
         </div>
         {% endif %}
         <p class="backtest-disclaimer">{{ pre_live_validation.next_step }} 현재 Gate A 결과는 실전 자금 투입 허가가 아니라 paper trading 후보 선별입니다. 미래 수익을 보장하지 않습니다.</p>
@@ -273,6 +315,69 @@
         {% endif %}
       </section>
 
+      {% if portfolio_backtest.available %}
+      <section class="panel backtest-panel portfolio-backtest-panel" id="backtest">
+        <div class="panel-header split">
+          <div>
+            <p class="eyebrow">과거 적용 시뮬레이션</p>
+            <h2>ETF 포트폴리오 백테스트</h2>
+          </div>
+          <span class="pill tone-info">{{ portfolio_backtest.start_date }} ~ {{ portfolio_backtest.end_date }}</span>
+        </div>
+        <div class="backtest-levels" aria-label="ETF 포트폴리오 핵심 성과">
+          <div><span>최종 선택</span><strong>{{ portfolio_backtest.best.display_name }}</strong></div>
+          <div><span>전략 수익률</span><strong class="{{ 'positive' if portfolio_backtest.best.total_return_percent >= 0 else 'negative' }}">{{ portfolio_backtest.best.total_return_label }}</strong></div>
+          <div><span>{{ portfolio_backtest.benchmark_name }} 대비</span><strong class="{{ 'positive' if portfolio_backtest.excess_return_percent >= 0 else 'negative' }}">{{ portfolio_backtest.excess_return_label }}</strong></div>
+          <div><span>초과 수익금</span><strong class="{{ 'positive' if portfolio_backtest.excess_profit >= 0 else 'negative' }}">{% if portfolio_backtest.excess_profit >= 0 %}+{% endif %}{{ portfolio_backtest.excess_profit_label }}</strong></div>
+        </div>
+        <div class="backtest-table-wrap">
+          <table class="backtest-table">
+            <thead>
+              <tr><th>순위</th><th>전략</th><th>최종금액</th><th>수익금</th><th>수익률</th><th>MDD</th><th>Risk-Off</th><th>최종 목표비중</th></tr>
+            </thead>
+            <tbody>
+              {% for result in portfolio_backtest.results %}
+              <tr>
+                <td>{{ result.rank }}</td>
+                <td>{{ result.display_name }}<small>{{ result.strategy_id }}</small></td>
+                <td>{{ result.final_value_label }}</td>
+                <td class="{{ 'positive' if result.profit >= 0 else 'negative' }}">{% if result.profit >= 0 %}+{% endif %}{{ result.profit_label }}</td>
+                <td class="{{ 'positive' if result.total_return_percent >= 0 else 'negative' }}">{{ result.total_return_label }}</td>
+                <td class="{{ 'positive' if result.max_drawdown_percent >= 0 else 'negative' }}">{{ result.max_drawdown_label }}</td>
+                <td>{{ result.risk_off_count }}회</td>
+                <td>{{ result.weights_label }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% if portfolio_backtest.live_readiness %}
+        <div class="trade-log">
+          <h3>실거래 준비도</h3>
+          <ul>
+            <li><span>{{ portfolio_backtest.live_readiness.status_label }}</span><em>live_capital_allowed=false</em></li>
+            <li><span>레버리지 ETF 비중 {{ portfolio_backtest.live_readiness.leveraged_weight_label }}</span><em>위험 한도 점검</em></li>
+            <li><span>최악 구간 MDD {{ portfolio_backtest.live_readiness.worst_window_drawdown_label }}</span><em>위기구간 검증</em></li>
+            {% if portfolio_backtest.live_readiness.recommended_action %}<li><span>{{ portfolio_backtest.live_readiness.recommended_action }}</span><em>다음 액션</em></li>{% endif %}
+            {% for reason in portfolio_backtest.live_readiness.failure_reasons %}<li><span>{{ reason }}</span><em>차단 사유</em></li>{% endfor %}
+          </ul>
+        </div>
+        {% endif %}
+        {% if portfolio_backtest.evaluation_windows %}
+        <div class="trade-log">
+          <h3>장기/위기구간 검증</h3>
+          <ul>{% for window in portfolio_backtest.evaluation_windows %}<li><span>{{ window.label }} · 전략 {{ window.strategy_return_label }} / MDD {{ window.strategy_mdd_label }} / 단순 DCA {{ window.benchmark_return_label }}</span><em>구간 검증</em></li>{% endfor %}</ul>
+        </div>
+        {% endif %}
+        {% if portfolio_backtest.assumptions %}
+        <div class="trade-log">
+          <h3>가정 및 제한</h3>
+          <ul>{% for assumption in portfolio_backtest.assumptions %}<li><span>{{ assumption }}</span><em>포트폴리오 검증 조건</em></li>{% endfor %}</ul>
+        </div>
+        {% endif %}
+        <p class="backtest-disclaimer">ETF 포트폴리오 결과는 월납입 계좌 기준 과거 시뮬레이션입니다. 미래 수익 보장이 아니며, 표본 부족·과최적화 위험이 있고 비용·세금·슬리피지·환율·한국 상장 ETF 괴리율/환헤지 차이는 별도 반영이 필요합니다.</p>
+      </section>
+      {% else %}
       <section class="panel backtest-panel" id="backtest">
         <div class="panel-header split">
           <div>
@@ -332,6 +437,7 @@
         </div>
         {% endif %}
       </section>
+      {% endif %}
 
       {% if structured_verified %}
       <section class="panel structured-status verified">
@@ -424,7 +530,7 @@
             </div>
             <details class="agent-detail">
               <summary><span>상세보기</span></summary>
-              <article class="report-body">{{ section.detail }}</article>
+              <article class="report-body markdown-body">{{ section.detail|markdown }}</article>
             </details>
           </article>
           {% endfor %}

@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{{ detail.title }} · TradingAgents 투자 리서치</title>
+    <link rel="stylesheet" href="/static/dashboard.css?v=20260507-signal-details" />
+  </head>
+  <body>
+    <main class="page stock-workspace signal-detail-page">
+      <header class="service-hero signal-detail-hero">
+        <div>
+          <a class="link-button secondary" href="{{ detail.back_href }}">← {{ detail.back_label }}</a>
+          <p class="eyebrow">{{ detail.eyebrow }}</p>
+          <h1>{{ detail.title }}</h1>
+          <p>{{ detail.subtitle }}</p>
+        </div>
+        <div class="score-badge">
+          <span>{{ detail.score_label }}</span>
+          <strong>{{ detail.score_value }}</strong>
+          <em>{{ detail.action_label }}</em>
+        </div>
+      </header>
+
+      <section class="panel premium-panel decision-snapshot signal-detail-decision" aria-label="오늘의 전략 판단">
+        <div class="panel-header split">
+          <div>
+            <p class="eyebrow">전략 판단</p>
+            <h2>오늘의 전략 판단</h2>
+            <p>{{ detail.thesis }}</p>
+          </div>
+          <a class="link-button" href="{{ detail.api_href }}">API 보기</a>
+        </div>
+        <div class="metric-grid compact-metrics signal-detail-metrics">
+          {% for metric in detail.metrics %}
+          <article>
+            <span>{{ metric.label }}</span>
+            <strong>{{ metric.value }}</strong>
+            {% if metric.note %}<p>{{ metric.note }}</p>{% endif %}
+          </article>
+          {% endfor %}
+        </div>
+      </section>
+
+      {% if detail.opinion %}
+      <section class="panel premium-panel" aria-label="전략 에이전트 의견">
+        <div class="panel-header">
+          <div>
+            <p class="eyebrow">Agent Opinion</p>
+            <h2>전략 에이전트 의견</h2>
+            <p>{{ detail.opinion.thesis }}</p>
+          </div>
+        </div>
+        <div class="asset-opinion-grid single-opinion">
+          <article class="asset-opinion-card opinion-{{ detail.opinion.tone }}">
+            <div class="asset-opinion-top">
+              <strong>{{ detail.opinion.ticker }}</strong>
+              <span>{{ detail.opinion.action }}</span>
+            </div>
+            <dl>
+              <div><dt>타이밍</dt><dd>{{ detail.opinion.timing }}</dd></div>
+              <div><dt>리스크</dt><dd>{{ detail.opinion.risk }}</dd></div>
+              <div><dt>신뢰도</dt><dd>{{ detail.opinion.confidence }}</dd></div>
+            </dl>
+          </article>
+        </div>
+      </section>
+      {% endif %}
+
+      {% if detail.chart_endpoint %}
+      <section class="panel premium-panel" aria-label="가격 차트">
+        <div class="panel-header">
+          <div>
+            <p class="eyebrow">가격 차트</p>
+            <h2>가격 차트</h2>
+            <p>Binance public market data 기반 캔들 차트입니다.</p>
+          </div>
+        </div>
+        <article class="crypto-live-card crypto-live-chart" data-chart-endpoint="{{ detail.chart_endpoint }}">
+          <div class="crypto-chart-canvas" aria-label="{{ detail.title }} 가격축 시간축 차트">차트 로딩 중...</div>
+          <div class="compact-meta">{{ detail.chart_endpoint }}</div>
+        </article>
+      </section>
+      {% endif %}
+
+      <section class="panel premium-panel" aria-label="상세 가격 레벨">
+        <div class="panel-header">
+          <div>
+            <p class="eyebrow">가격 레벨</p>
+            <h2>상세 가격 레벨</h2>
+            <p>대시보드 표에 보이던 현재가, 진입구간, 목표가, 손절가를 한 화면에서 확인합니다.</p>
+          </div>
+        </div>
+        <div class="table-wrap premium-table compact-signal-table">
+          <table>
+            <thead><tr><th>항목</th><th>값</th></tr></thead>
+            <tbody>
+              {% for item in detail.rows %}
+              <tr><td>{{ item.label }}</td><td><strong>{{ item.value }}</strong></td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+    <script src="/static/crypto-chart.js?v=20260507-signal-details"></script>
+  </body>
+</html>

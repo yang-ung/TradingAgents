@@ -119,14 +119,18 @@ def test_dashboard_batch_job_api_runs_in_background_with_injected_runner(tmp_pat
 
 
 @pytest.mark.unit
-def test_dashboard_batch_job_api_validates_inputs_and_renders_form(tmp_path):
+def test_dashboard_batch_job_api_validates_inputs_and_hides_manual_batch_ui(tmp_path):
     client = TestClient(create_dashboard_app(tmp_path, batch_runner=lambda *args, **kwargs: {}))
 
     page = client.get("/")
     assert page.status_code == 200
-    assert "새 배치 실행" in page.text
-    assert "종목 입력" in page.text
-    assert "실행 상태" in page.text
+    assert "새 배치 실행" not in page.text
+    assert "종목 입력" not in page.text
+    assert "실행 상태" not in page.text
+    assert "batch-form" not in page.text
+    assert "refreshJobs" not in page.text
+    assert "/api/batch-jobs" not in page.text
+    assert "정해진 시간에 자동으로 갱신" in page.text
 
     missing_tickers = client.post("/api/batch-jobs", json={"tickers": "", "trade_date": "2026-04-30"})
     assert missing_tickers.status_code == 400

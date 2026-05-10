@@ -10,7 +10,7 @@ from typing import Any, Dict, List, Optional, Sequence
 from .extract import dump_record, load_record
 from .models import AnalysisRecord
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 5
 
 
 def _utc_now_iso() -> str:
@@ -83,7 +83,11 @@ class AnalysisRepository:
                 "CREATE INDEX IF NOT EXISTS idx_analyses_archived_generated_at ON analyses(archived, generated_at DESC)"
             )
             self._ensure_batch_jobs_schema(connection)
+            self._ensure_crypto_live_paper_state_schema(connection)
+            self._ensure_cross_market_context_schema(connection)
+            self._ensure_strategy_self_feedback_schema(connection)
             self._backfill_metadata_columns(connection)
+            self._migrate_legacy_crypto_live_state(connection)
             connection.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
             connection.commit()
 
@@ -113,6 +117,84 @@ class AnalysisRepository:
         )
         connection.execute(
             "CREATE INDEX IF NOT EXISTS idx_batch_jobs_trade_date_created_at ON batch_jobs(trade_date, created_at DESC)"
+        )
+
+    def _ensure_crypto_live_paper_state_schema(self, connection: sqlite3.Connection) -> None:
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS crypto_live_paper_state (
+                state_key TEXT PRIMARY KEY,
+                generated_at TEXT NOT NULL DEFAULT '',
+                state_json TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+            """
+        )
+        connection.execute(
+            "CREATE INDEX IF NOT EXISTS idx_crypto_live_paper_state_updated_at ON crypto_live_paper_state(updated_at DESC)"
+        )
+
+    def _ensure_cross_market_context_schema(self, connection: sqlite3.Connection) -> None:
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS cross_market_context (
+                context_key TEXT PRIMARY KEY,
+                generated_at TEXT NOT NULL DEFAULT '',
+                source_updated_at TEXT NOT NULL DEFAULT '',
+                context_json TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+            """
+        )
+        connection.execute(
+            "CREATE INDEX IF NOT EXISTS idx_cross_market_context_updated_at ON cross_market_context(updated_at DESC)"
+        )
+
+    def _ensure_strategy_self_feedback_schema(self, connection: sqlite3.Connection) -> None:
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS strategy_self_feedback_loops (
+                loop_id TEXT PRIMARY KEY,
+                ticker TEXT NOT NULL,
+                trade_date TEXT NOT NULL DEFAULT '',
+                generated_at TEXT NOT NULL DEFAULT '',
+                requested_iterations INTEGER NOT NULL DEFAULT 0,
+                completed_iterations INTEGER NOT NULL DEFAULT 0,
+                best_iteration INTEGER,
+                live_capital_allowed INTEGER NOT NULL DEFAULT 0,
+                loop_json TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+            """
+        )
+        connection.execute(
+            "CREATE INDEX IF NOT EXISTS idx_strategy_self_feedback_ticker_generated_at ON strategy_self_feedback_loops(ticker, generated_at DESC)"
+        )
+
+    def _migrate_legacy_crypto_live_state(self, connection: sqlite3.Connection) -> None:
+        existing = connection.execute(
+            "SELECT 1 FROM crypto_live_paper_state WHERE state_key = 'default' LIMIT 1"
+        ).fetchone()
+        if existing is not None:
+            return
+        legacy_path = self.base_dir / "crypto_live_paper_state.json"
+        if not legacy_path.exists():
+            return
+        try:
+            payload = json.loads(legacy_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            return
+        if not isinstance(payload, dict):
+            return
+        serialized = json.dumps(payload, ensure_ascii=False, sort_keys=True)
+        generated_at = str(payload.get("generated_at") or "")
+        now = _utc_now_iso()
+        connection.execute(
+            """
+            INSERT INTO crypto_live_paper_state (state_key, generated_at, state_json, updated_at)
+            VALUES ('default', ?, ?, ?)
+            """,
+            (generated_at, serialized, now),
         )
 
     def _backfill_metadata_columns(self, connection: sqlite3.Connection) -> None:
@@ -265,6 +347,173 @@ class AnalysisRepository:
             )
             connection.commit()
         return materialized
+
+    def save_strategy_self_feedback_loop(self, loop: Dict[str, Any]) -> Dict[str, Any]:
+        materialized = dict(loop or {})
+        loop_id = str(materialized.get("loop_id") or uuid.uuid4())
+        materialized["loop_id"] = loop_id
+        materialized["loop_type"] = materialized.get("loop_type") or "strategy_self_feedback"
+        materialized["live_capital_allowed"] = False
+        generated_at = str(materialized.get("generated_at") or _utc_now_iso())
+        materialized["generated_at"] = generated_at
+        serialized = json.dumps(materialized, ensure_ascii=False, sort_keys=True)
+        now = _utc_now_iso()
+        with self._connect() as connection:
+            connection.execute(
+                """
+                INSERT INTO strategy_self_feedback_loops (
+                    loop_id, ticker, trade_date, generated_at, requested_iterations,
+                    completed_iterations, best_iteration, live_capital_allowed,
+                    loop_json, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?)
+                ON CONFLICT(loop_id) DO UPDATE SET
+                    ticker=excluded.ticker,
+                    trade_date=excluded.trade_date,
+                    generated_at=excluded.generated_at,
+                    requested_iterations=excluded.requested_iterations,
+                    completed_iterations=excluded.completed_iterations,
+                    best_iteration=excluded.best_iteration,
+                    live_capital_allowed=0,
+                    loop_json=excluded.loop_json,
+                    updated_at=excluded.updated_at
+                """,
+                (
+                    loop_id,
+                    str(materialized.get("ticker") or ""),
+                    str(materialized.get("trade_date") or ""),
+                    generated_at,
+                    int(materialized.get("requested_iterations") or 0),
+                    int(materialized.get("completed_iterations") or 0),
+                    materialized.get("best_iteration"),
+                    serialized,
+                    now,
+                ),
+            )
+            connection.commit()
+        return materialized
+
+    def get_strategy_self_feedback_loop(self, loop_id: str) -> Optional[Dict[str, Any]]:
+        with self._connect() as connection:
+            row = connection.execute(
+                "SELECT loop_json FROM strategy_self_feedback_loops WHERE loop_id = ?",
+                (loop_id,),
+            ).fetchone()
+        if row is None:
+            return None
+        try:
+            payload = json.loads(row["loop_json"])
+        except json.JSONDecodeError:
+            return None
+        return payload if isinstance(payload, dict) else None
+
+    def list_strategy_self_feedback_loops(
+        self,
+        *,
+        ticker: str | None = None,
+        limit: int | None = None,
+    ) -> List[Dict[str, Any]]:
+        clauses: list[str] = []
+        params: list[Any] = []
+        if ticker:
+            clauses.append("UPPER(ticker) = UPPER(?)")
+            params.append(ticker)
+        sql = "SELECT loop_json FROM strategy_self_feedback_loops"
+        if clauses:
+            sql += " WHERE " + " AND ".join(clauses)
+        sql += " ORDER BY generated_at DESC, loop_id ASC"
+        if limit is not None:
+            sql += " LIMIT ?"
+            params.append(max(0, int(limit)))
+        with self._connect() as connection:
+            rows = connection.execute(sql, params).fetchall()
+        loops: List[Dict[str, Any]] = []
+        for row in rows:
+            try:
+                payload = json.loads(row["loop_json"])
+            except json.JSONDecodeError:
+                continue
+            if isinstance(payload, dict):
+                loops.append(payload)
+        return loops
+
+    def save_crypto_live_paper_state(self, state: Dict[str, Any], *, state_key: str = "default") -> Dict[str, Any]:
+        materialized = dict(state or {})
+        generated_at = str(materialized.get("generated_at") or "")
+        serialized = json.dumps(materialized, ensure_ascii=False, sort_keys=True)
+        now = _utc_now_iso()
+        with self._connect() as connection:
+            connection.execute(
+                """
+                INSERT INTO crypto_live_paper_state (state_key, generated_at, state_json, updated_at)
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT(state_key) DO UPDATE SET
+                    generated_at=excluded.generated_at,
+                    state_json=excluded.state_json,
+                    updated_at=excluded.updated_at
+                """,
+                (state_key, generated_at, serialized, now),
+            )
+            connection.commit()
+        return materialized
+
+    def get_crypto_live_paper_state(self, *, state_key: str = "default") -> Optional[Dict[str, Any]]:
+        with self._connect() as connection:
+            row = connection.execute(
+                "SELECT state_json FROM crypto_live_paper_state WHERE state_key = ?",
+                (state_key,),
+            ).fetchone()
+        if row is None:
+            return None
+        try:
+            payload = json.loads(row["state_json"])
+        except json.JSONDecodeError:
+            return None
+        return payload if isinstance(payload, dict) else None
+
+    def save_cross_market_context(
+        self,
+        context: Dict[str, Any],
+        *,
+        context_key: str = "default",
+        source_updated_at: str = "",
+    ) -> Dict[str, Any]:
+        materialized = dict(context or {})
+        generated_at = str(materialized.get("generated_at") or "")
+        serialized = json.dumps(materialized, ensure_ascii=False, sort_keys=True)
+        now = _utc_now_iso()
+        with self._connect() as connection:
+            connection.execute(
+                """
+                INSERT INTO cross_market_context (context_key, generated_at, source_updated_at, context_json, updated_at)
+                VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(context_key) DO UPDATE SET
+                    generated_at=excluded.generated_at,
+                    source_updated_at=excluded.source_updated_at,
+                    context_json=excluded.context_json,
+                    updated_at=excluded.updated_at
+                """,
+                (context_key, generated_at, source_updated_at, serialized, now),
+            )
+            connection.commit()
+        return materialized
+
+    def get_cross_market_context(self, *, context_key: str = "default") -> Optional[Dict[str, Any]]:
+        with self._connect() as connection:
+            row = connection.execute(
+                "SELECT context_json, source_updated_at FROM cross_market_context WHERE context_key = ?",
+                (context_key,),
+            ).fetchone()
+        if row is None:
+            return None
+        try:
+            payload = json.loads(row["context_json"])
+        except json.JSONDecodeError:
+            return None
+        if not isinstance(payload, dict):
+            return None
+        payload["state_persistence"] = "sqlite"
+        payload["source_updated_at"] = row["source_updated_at"]
+        return payload
 
     def _filter_sql(
         self,

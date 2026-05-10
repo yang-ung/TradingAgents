@@ -3,13 +3,13 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>TradingAgents 투자 리서치 운영센터</title>
+    <title>TradingAgents 투자 리서치</title>
     <style>
       html { background: #07070b; }
       body { margin: 0; min-height: 100vh; background: #07070b; color: #f7f8ff; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif; }
       .page { max-width: 1520px; margin: 0 auto; padding: 28px 24px 88px; }
     </style>
-    <link rel="stylesheet" href="{{ url_for('static', path='/dashboard.css') }}" />
+    <link rel="stylesheet" href="/static/dashboard.css?v=20260507-unified-crypto-opinions" />
   </head>
   <body>
     <main class="page service-dashboard">
@@ -19,122 +19,446 @@
             <span class="brand-mark">TA</span>
             <span>TradingAgents Intelligence</span>
           </div>
-          <p class="eyebrow">핵심 정보</p>
-          <h1>오늘의 투자 판단</h1>
-          <div class="hero-facts" aria-label="핵심 정보 요약">
-            <div><span>검증 리포트</span><strong>{{ dashboard_metrics.verified_ratio }}%</strong></div>
-            <div><span>분석 종목</span><strong>{{ dashboard_metrics.visible_runs }}</strong></div>
-            <div><span>최근 업데이트</span><strong>{{ dashboard_metrics.latest_updated_label }}</strong></div>
-          </div>
-          <div class="hero-actions">
-            <a class="link-button" href="#runs">분석 목록 보기</a>
-            <a class="link-button secondary" href="#batch">새 배치 실행</a>
-            <a class="link-button ghost" href="/management">DB 관리</a>
-          </div>
+          <p class="eyebrow">{{ active_dashboard.eyebrow }}</p>
+          <h1>{{ active_dashboard.title }}</h1>
+          <p class="hero-description">{{ active_dashboard.description }}</p>
         </div>
-        <aside class="service-status-card" aria-label="서비스 상태">
-          <div class="status-header">
-            <span class="live-dot"></span>
-            <span>서비스 상태</span>
-          </div>
-          <dl class="service-status-grid">
-            <div><dt>DB</dt><dd>{{ dashboard_metrics.db_rows }} rows</dd></div>
-            <div><dt>Payload</dt><dd>{{ dashboard_metrics.payload_files }} files</dd></div>
-            <div><dt>Active jobs</dt><dd>{{ dashboard_metrics.active_jobs }}</dd></div>
-            <div><dt>최근 갱신</dt><dd>{{ dashboard_metrics.latest_updated_label }}</dd></div>
-          </dl>
-          <p class="muted-left">데이터셋: {{ data_dir }}</p>
-        </aside>
       </header>
 
-      <section class="kpi-grid" aria-label="운영 KPI">
-        <article class="kpi-card accent-purple">
-          <span class="kpi-label">전체 분석</span>
-          <strong>{{ dashboard_metrics.total_runs }}</strong>
-          <p>현재 필터 기준 {{ dashboard_metrics.visible_runs }}건 표시</p>
-        </article>
-        <article class="kpi-card accent-green">
-          <span class="kpi-label">검증 리포트</span>
-          <strong>{{ dashboard_metrics.verified_ratio }}%</strong>
-          <p>{{ dashboard_metrics.verified_count }}건이 구조화 검증 통과</p>
-        </article>
-        <article class="kpi-card accent-blue">
-          <span class="kpi-label">한국 시장</span>
-          <strong>{{ dashboard_metrics.kr_runs }}</strong>
-          <p>KOSPI/KOSDAQ/KRX 분석 커버리지</p>
-        </article>
-        <article class="kpi-card accent-amber">
-          <span class="kpi-label">최근 업데이트</span>
-          <strong>{{ dashboard_metrics.latest_updated_label }}</strong>
-          <p>최신 분석 생성 시각</p>
-        </article>
-      </section>
-
-      <section class="insight-grid" aria-label="오늘의 투자 판단과 운영 인사이트">
-        <article class="panel premium-panel market-overview">
-          <div class="panel-header split">
-            <div>
-              <p class="eyebrow">Decision Snapshot</p>
-              <h2>오늘의 투자 판단</h2>
-              <p>상단에는 최신 결론을 빠르게 훑고, 상세 보기에서 검증된 구조화 리포트를 확인합니다.</p>
-            </div>
+      {% if active_dashboard.key in ['summary', 'kospi', 'nasdaq'] %}
+      <section class="panel premium-panel market-overview decision-first-panel" aria-label="오늘의 투자 판단">
+        <div class="panel-header split">
+          <div>
+            <p class="eyebrow">투자 판단</p>
+            <h2>오늘의 투자 판단</h2>
+            <p>지금 확인해야 할 종목별 판단과 핵심 근거만 먼저 보여줍니다.</p>
           </div>
-          <div class="decision-strip">
-            {% for rating, count in dashboard_metrics.rating_counts.items() %}
-            <div class="decision-chip">
-              <span class="pill pill-{{ rating|lower }}">{{ rating }}</span>
-              <strong>{{ count }}</strong>
-              <span>건</span>
+        </div>
+        <div class="decision-strip">
+          {% for rating, count in dashboard_metrics.rating_counts.items() %}
+          <div class="decision-chip">
+            <span class="pill pill-{{ rating|lower }}">{{ rating }}</span>
+            <strong>{{ count }}</strong>
+            <span>건</span>
+          </div>
+          {% else %}
+          <div class="empty compact">아직 판단 데이터가 없습니다.</div>
+          {% endfor %}
+        </div>
+        <div class="run-card-list decision-card-list">
+          {% for run in runs[:4] %}
+          <a class="run-card" href="/runs/{{ run.run_id }}">
+            <div>
+              <span class="ticker-symbol">{{ run.display_label }}</span>
+              <span class="pill pill-{{ run.rating|lower }}">{{ run.rating }}</span>
             </div>
-            {% else %}
-            <div class="empty compact">아직 판단 데이터가 없습니다.</div>
+            <p>{{ run.decision_summary }}</p>
+            <small>{{ run.trade_date }} · {{ run.trader_action }}</small>
+          </a>
+          {% else %}
+          <div class="empty compact">표시할 분석 결과가 없습니다.</div>
+          {% endfor %}
+        </div>
+      </section>
+      {% endif %}
+
+      <nav class="dashboard-tabs" aria-label="대시보드 구분">
+        {% for item in dashboard_nav %}
+        <a class="dashboard-tab dashboard-tab-{{ item.accent }} {% if item.key == active_dashboard.key %}active{% endif %}" href="{{ item.href }}" {% if item.key == active_dashboard.key %}aria-current="page"{% endif %}>
+          <span class="dashboard-tab-icon" aria-hidden="true">{{ item.icon }}</span>
+          <span class="dashboard-tab-body">
+            <strong>{{ item.title }}</strong>
+            <span class="dashboard-tab-short">{{ item.short_label }}</span>
+            <em class="dashboard-tab-meta">{{ item.meta }}</em>
+            <span>{{ item.description }}</span>
+          </span>
+        </a>
+        {% endfor %}
+      </nav>
+
+      {% if cross_market_context.available %}
+      <section class="panel premium-panel cross-market-panel" aria-label="시장 연결 인텔리전스">
+        <div class="panel-header split">
+          <div>
+            <p class="eyebrow">시장 연결 인텔리전스</p>
+            <h2>자산군이 서로 참고하는 공통 시장 판단</h2>
+            <p>{{ cross_market_context.summary.thesis }}</p>
+          </div>
+          <div class="score-badge"><span>공통 시장점수</span><strong>{{ cross_market_context.summary.market_score }}</strong><em>{{ cross_market_context.summary.regime_label }}</em></div>
+        </div>
+        <div class="cross-market-link-strip">
+          {% for link in cross_market_context.cross_market_links[:3] %}
+          <article class="cross-market-mini-card tone-{{ link.tone }}">
+            <span>{{ link.source }} → {{ link.target }}</span>
+            <strong>{{ link.title }}</strong>
+            <p>{{ link.implication }}</p>
+            <em>{{ link.action }}</em>
+          </article>
+          {% endfor %}
+        </div>
+        <div class="panel-footer-actions">
+          <a class="link-button compact-link" href="/market-context">연결 분석 상세 보기</a>
+          <a class="link-button compact-link secondary" href="/api/market-context">API</a>
+        </div>
+      </section>
+      {% endif %}
+
+
+      {% if active_dashboard.key == 'summary' %}
+      <section class="panel premium-panel hourly-report-panel" aria-label="장 운영 전략 리포트">
+        <div class="panel-header split">
+          <div>
+            <p class="eyebrow">장 운영 리포트</p>
+            <h2>장 운영 전략 리포트</h2>
+            <p>{{ hourly_report.report_cadence_label if hourly_report.available and hourly_report.report_cadence_label else '장 이벤트 기준 리포트 · 시스템 트레이딩 상시 추적' }}</p>
+          </div>
+          {% if hourly_report.available and hourly_report.market_summary %}
+          <div class="score-badge"><span>시장 점수</span><strong>{{ hourly_report.market_summary.market_score }}</strong><em>{{ hourly_report.market_summary.risk_level_label }}</em></div>
+          {% endif %}
+        </div>
+        {% if hourly_report.available %}
+        <div class="hourly-summary-grid compact-market-summary">
+          <article class="hourly-primary-card">
+            <span>{{ hourly_report.report_stage if hourly_report.report_stage else '장 운영' }}</span>
+            <strong>{{ hourly_report.report_purpose if hourly_report.report_purpose else (hourly_report.market_summary.change_summary if hourly_report.market_summary else hourly_report.title) }}</strong>
+            {% if hourly_report.market_summary and hourly_report.market_summary.change_summary %}
+            <p>{{ hourly_report.market_summary.change_summary }}</p>
+            {% endif %}
+            <em>{{ hourly_report.generated_at }}</em>
+          </article>
+        </div>
+        <div class="hourly-board-grid">
+          <article class="hourly-board-card">
+            <h3>ETF/주식 상위 신호</h3>
+            <ul>
+              {% for row in hourly_report.stock_signals[:5] %}
+              <li><strong>{{ row.ticker }}</strong> {{ row.action }} · {{ row.status_label }} · {{ row.entry_zone_label }} <span>{{ row.risk_reward_label }}</span></li>
+              {% else %}
+              <li>표시할 ETF/주식 신호 없음</li>
+              {% endfor %}
+            </ul>
+          </article>
+          <article class="hourly-board-card">
+            <h3>암호화폐 모의투자</h3>
+            <ul>
+              {% for row in hourly_report.crypto_signals[:5] %}
+              <li><strong>{{ row.ticker }}</strong> {{ row.action }} · 점수 {{ row.signal_score }} · {{ row.entry_zone_label }} <span>{{ row.paper_return_label }}</span></li>
+              {% else %}
+              <li>표시할 암호화폐 신호 없음</li>
+              {% endfor %}
+            </ul>
+          </article>
+        </div>
+        {% else %}
+        <div class="empty compact">아직 dashboard용 hourly report가 없습니다. 다음 hourly job이 생성하면 이 보드가 채워집니다.</div>
+        {% endif %}
+      </section>
+      {% endif %}
+
+      {% if active_dashboard.key in ['kospi', 'nasdaq'] %}
+      <section class="panel premium-panel return-leaderboard-panel" aria-label="전략 성과 점검">
+        <div class="panel-header split">
+          <div>
+            <p class="eyebrow">전략 성과</p>
+            <h2>전략 성과 점검</h2>
+            <p>저장된 전략 규칙을 과거 가격에 적용했을 때의 전략 수익률과 1억원 기준 손익입니다.</p>
+          </div>
+        </div>
+        <div class="return-leaderboard-grid">
+          {% for item in return_leaderboard %}
+          <a class="return-leaderboard-card" href="/runs/{{ item.run_id }}">
+            <div class="return-rank">{{ loop.index }}</div>
+            <div class="return-main">
+              <strong>{{ item.display_label }}</strong>
+              <span>{{ item.start_date }} ~ {{ item.end_date }} · 표본 {{ item.trade_count }}회 · {{ item.sample_status_label }}</span>
+            </div>
+            <div class="return-metrics">
+              <strong class="{{ 'positive' if item.strategy_return_percent >= 0 else 'negative' }}">{{ item.strategy_return_label }}</strong>
+              <span class="{{ 'positive' if item.pnl >= 0 else 'negative' }}">{% if item.pnl >= 0 %}+{% endif %}{{ item.pnl_label }}</span>
+              <em>벤치마크 {{ item.benchmark_return_label }} · 초과수익 {{ item.excess_return_label }}</em>
+            </div>
+          </a>
+          {% else %}
+          <div class="empty compact">수익률을 계산할 수 있는 전략/가격 데이터가 아직 없습니다.</div>
+          {% endfor %}
+        </div>
+        <p class="backtest-disclaimer">현재 리포트의 진입·익절·손절 규칙을 과거 가격에 적용한 시뮬레이션이며, 수수료·세금·슬리피지는 반영하지 않습니다.</p>
+      </section>
+      {% endif %}
+
+      {% if active_dashboard.key == 'etf' %}
+      <section class="panel premium-panel signal-price-table-panel" aria-label="자동매매 가격표">
+        <div class="panel-header split">
+          <div>
+            <p class="eyebrow">ETF 전략</p>
+            <h2>오늘의 ETF 전략 판단</h2>
+            <p>시장 점수와 프로그램 기반 가격·패턴 터치 신호를 결합한 매수/매도 후보입니다.</p>
+          </div>
+          {% if signal_snapshot.available %}
+          <div class="score-badge"><span>시장 점수</span><strong>{{ signal_snapshot.market_score }}</strong><em>{{ signal_snapshot.risk_level_label }}</em></div>
+          {% endif %}
+        </div>
+        {% if signal_snapshot.available and signal_snapshot.change_summary %}
+        <div class="signal-change-summary">
+          <strong>{{ signal_snapshot.change_summary }}</strong>
+          {% if signal_snapshot.change_explanation %}
+          <div class="compact-meta">{% for reason in signal_snapshot.change_explanation %}<span>{{ reason }}</span>{% if not loop.last %} · {% endif %}{% endfor %}</div>
+          {% endif %}
+        </div>
+        {% endif %}
+        {% if signal_snapshot.available and signal_snapshot.factor_breakdown %}
+        <div class="signal-change-summary" aria-label="시장점수 구성">
+          <strong>시장점수 구성</strong>
+          <div class="compact-meta">기준점수 {{ signal_snapshot.score_base }}에서 아래 항목을 더해 산출합니다.</div>
+          {% if signal_snapshot.score_formula %}
+          <div class="compact-meta">{{ signal_snapshot.score_formula }}</div>
+          {% endif %}
+          <div class="factor-breakdown-grid">
+            {% for factor in signal_snapshot.factor_breakdown %}
+            <div class="factor-breakdown-card">
+              <strong>{{ factor.label }}</strong>
+              <span>{{ factor.description }}</span>
+              <em>현재 {{ factor.contribution_label }} · 이전 {{ factor.previous_score }}점 · 변화 {{ factor.delta_label }}</em>
+            </div>
             {% endfor %}
           </div>
-          <div class="run-card-list">
-            {% for run in runs[:4] %}
-            <a class="run-card" href="/runs/{{ run.run_id }}">
-              <div>
-                <span class="ticker-symbol">{{ run.display_label }}</span>
-                <span class="pill pill-{{ run.rating|lower }}">{{ run.rating }}</span>
-              </div>
-              <p>{{ run.decision_summary }}</p>
-              <small>{{ run.market }}{% if run.exchange %}/{{ run.exchange }}{% endif %} · {{ run.trade_date }}</small>
-            </a>
-            {% else %}
-            <div class="empty compact">표시할 분석 결과가 없습니다.</div>
-            {% endfor %}
-          </div>
-        </article>
+        </div>
+        {% endif %}
+        {% if signal_snapshot.available and signal_snapshot.rows %}
+        <div class="table-wrap premium-table compact-signal-table">
+          <table>
+            <thead>
+              <tr>
+                <th>종목</th><th>현재가</th><th>상태</th><th>진입구간</th><th>손절</th><th>목표1</th><th>시장/패턴</th><th>액션</th><th>상세</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in signal_snapshot.rows %}
+              <tr>
+                <td><strong class="ticker-symbol">{{ row.ticker }}</strong></td>
+                <td>{{ row.current_price }}</td>
+                <td>{{ row.status_label }}</td>
+                <td>{{ row.entry_zone_label }}</td>
+                <td>{{ row.stop_loss if row.stop_loss is not none else '-' }}</td>
+                <td>{{ row.take_profit_1 if row.take_profit_1 is not none else '-' }}</td>
+                <td>{{ row.market_score }} / {{ row.pattern_score }}</td>
+                <td><strong>{{ row.action }}</strong><div class="compact-meta">{{ row.live_capital_allowed_label }}</div></td>
+                <td><a class="link-button compact-link" href="/signals/price-table/{{ row.ticker }}">상세 보기</a></td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <div class="empty compact">아직 생성된 가격표 스냅샷이 없습니다. hourly signal job이 생성하면 여기에 표시됩니다.</div>
+        {% endif %}
+      </section>
+      {% endif %}
 
-        <article class="panel premium-panel operations-panel">
-          <div class="panel-header split">
+      {% if active_dashboard.key == 'crypto' %}
+      <section class="panel premium-panel crypto-signal-panel" aria-label="오늘의 암호화폐 전략 판단">
+        <div class="panel-header split">
+          <div>
+            <p class="eyebrow">암호화폐 전략</p>
+            <h2>오늘의 암호화폐 전략 판단</h2>
+            <p>BTC/ETH/SOL 등 주요 암호화폐의 개별 전략 의견, 가격 레벨, 체결 이벤트, 손익을 같은 구조로 추적합니다.</p>
+          </div>
+          {% if crypto_signal_snapshot.available and crypto_signal_snapshot.paper_portfolio %}
+          <div class="score-badge"><span>포트폴리오 수익률</span><strong data-live-return>{{ crypto_signal_snapshot.paper_portfolio.return_label or crypto_signal_snapshot.paper_portfolio.return_percent ~ '%' }}</strong><em data-live-status>{{ crypto_signal_snapshot.paper_portfolio.profit_status_label or '본전권' }}</em></div>
+          {% endif %}
+        </div>
+        {% if crypto_signal_snapshot.available %}
+        {% set primary_crypto = crypto_signal_snapshot.rows[0] if crypto_signal_snapshot.rows else none %}
+        {% if crypto_signal_snapshot.paper_portfolio %}
+        <div class="crypto-paper-summary" aria-label="암호화폐 전략 요약" data-live-pnl="/api/signals/crypto/live-pnl">
+          <article>
+            <span>갱신 주기</span>
+            <strong>{{ crypto_signal_snapshot.crypto_update_cadence_label or crypto_signal_snapshot.paper_portfolio.cadence_label or '암호화폐 1시간마다 갱신' }}</strong>
+            <p>전략은 1시간마다, 가격과 손익은 실시간으로 갱신합니다.</p>
+          </article>
+          <article>
+            <span>실시간 PnL</span>
+            <strong data-live-return>{{ crypto_signal_snapshot.paper_portfolio.return_label or crypto_signal_snapshot.paper_portfolio.return_percent ~ '%' }}</strong>
+            <p><span data-live-status>{{ crypto_signal_snapshot.paper_portfolio.profit_status_label or '본전권' }}</span> · <span data-live-pnl-label>{{ crypto_signal_snapshot.paper_portfolio.pnl_label or '-' }}</span></p>
+          </article>
+          <article>
+            <span>평가금액</span>
+            <strong data-live-portfolio-value>{{ crypto_signal_snapshot.paper_portfolio.portfolio_value_label or (crypto_signal_snapshot.paper_portfolio.portfolio_value|money('KRW')) }}</strong>
+            <p>현재 포트폴리오 가치</p>
+          </article>
+          <article>
+            <span>매수가</span>
+            <strong>{{ primary_crypto.entry_zone_display if primary_crypto else '-' }}</strong>
+            <p>현재 전략 진입구간</p>
+          </article>
+          <article>
+            <span>목표가</span>
+            <strong>{{ primary_crypto.take_profit_1_label if primary_crypto else '-' }}</strong>
+            <p>1차 매도 기준</p>
+          </article>
+          <article>
+            <span>손절가</span>
+            <strong>{{ primary_crypto.stop_loss_label if primary_crypto else '-' }}</strong>
+            <p>리스크 기준</p>
+          </article>
+        </div>
+        <div class="trade-history-card asset-holdings-card" data-live-assets>
+          <div class="panel-header compact-header">
             <div>
-              <p class="eyebrow">Operations</p>
-              <h2>운영 인사이트</h2>
-              <p>데이터 신뢰도, 시장 커버리지, 배치 상태를 운영 관점에서 확인합니다.</p>
+              <p class="eyebrow">현재 자산</p>
+              <h3>현재 자산 내역</h3>
+              <p>수익률이 어디서 나오는지 코인별 보유금액과 평가손익으로 확인합니다.</p>
             </div>
           </div>
-          <dl class="ops-list">
-            <div><dt>검증 커버리지</dt><dd>{{ dashboard_metrics.verified_count }} / {{ dashboard_metrics.visible_runs }}</dd></div>
-            <div><dt>시장 분포</dt><dd>{% for market, count in dashboard_metrics.market_counts.items() %}<span>{{ market }} {{ count }}</span>{% else %}<span>-</span>{% endfor %}</dd></div>
-            <div><dt>실패 Job</dt><dd>{{ dashboard_metrics.failed_jobs }}</dd></div>
-            <div><dt>운영 권장</dt><dd>최신만 필터로 중복 종목을 정리하고, 검증 리포트 비율을 우선 확인하세요.</dd></div>
-          </dl>
-        </article>
+          <div class="table-wrap premium-table compact-signal-table">
+            <table>
+              <thead>
+                <tr><th>코인</th><th>보유수량</th><th>매수가</th><th>현재가</th><th>평가금액</th><th>평가손익</th><th>수익률</th></tr>
+              </thead>
+              <tbody data-live-assets-body>
+                {% for position in crypto_signal_snapshot.paper_portfolio.positions[:10] %}
+                <tr>
+                  <td><strong class="ticker-symbol">{{ position.ticker }}</strong></td>
+                  <td>{{ position.quantity_label or position.quantity }}</td>
+                  <td>{{ position.entry_price_label or (position.entry_price|money('KRW')) }}</td>
+                  <td>{{ position.current_price_label or (position.current_price|money('KRW')) }}</td>
+                  <td>{{ position.market_value_label or (position.market_value|money('KRW')) }}</td>
+                  <td>{{ position.unrealized_pnl_label or '-' }}</td>
+                  <td>{{ position.unrealized_return_label or '-' }}</td>
+                </tr>
+                {% else %}
+                <tr><td colspan="7" class="empty">현재 보유 자산이 없습니다.</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        {% endif %}
+        <div class="crypto-live-grid" aria-label="Binance 실시간 가격과 가격 차트">
+          <article class="crypto-live-card">
+            <p class="eyebrow">실시간 가격</p>
+            <h3>Binance 실시간 가격</h3>
+            <p>가격, 수익률, 최근 체결 내역을 자동으로 갱신합니다. 거래 수수료는 체결 내역에 함께 표시합니다.</p>
+            <div class="compact-meta">현재 전략: 1시간마다 매수가·목표가·손절가·비중 재계산</div>
+          </article>
+          <article class="crypto-live-card crypto-live-chart" data-chart-endpoint="/api/signals/crypto/chart/BTC-USD">
+            <p class="eyebrow">가격 차트</p>
+            <h3>가격 차트</h3>
+            <div class="crypto-chart-canvas" aria-label="BTC-USD 실시간 가격 차트">차트 로딩 중...</div>
+            <div class="compact-meta">BTC-USD 기본 표시 · /api/signals/crypto/chart/BTC-USD</div>
+          </article>
+        </div>
+        <div class="signal-change-summary unified-insight-card">
+          <strong>시장 전체 의견</strong>
+          <div class="compact-meta">{{ crypto_signal_snapshot.llm_market_view.display_summary or crypto_signal_snapshot.llm_market_view.summary }}</div>
+          {% if crypto_signal_snapshot.strategy_revision %}
+          <div class="compact-meta">전략 수정 점검: {{ crypto_signal_snapshot.strategy_revision.display_reason or crypto_signal_snapshot.strategy_revision.reason }}</div>
+          {% endif %}
+        </div>
+        {% if crypto_signal_snapshot.rows %}
+        <div class="asset-opinion-grid" aria-label="코인별 전략 에이전트 의견">
+          {% for row in crypto_signal_snapshot.rows[:5] %}
+          {% set opinion = row.strategy_agent_opinion %}
+          <article class="asset-opinion-card opinion-{{ opinion.tone }}">
+            <div class="asset-opinion-top">
+              <strong>{{ opinion.ticker }}</strong>
+              <span>{{ opinion.action }}</span>
+            </div>
+            <p>{{ opinion.thesis }}</p>
+            <a class="link-button compact-link" href="/signals/crypto/{{ row.ticker }}">상세 보기</a>
+            <dl>
+              <div><dt>타이밍</dt><dd>{{ opinion.timing }}</dd></div>
+              <div><dt>리스크</dt><dd>{{ opinion.risk }}</dd></div>
+              <div><dt>신뢰도</dt><dd>{{ opinion.confidence }}</dd></div>
+            </dl>
+          </article>
+          {% endfor %}
+        </div>
+        <div class="table-wrap premium-table compact-signal-table">
+          <table>
+            <thead>
+              <tr>
+                <th>코인</th><th>현재가</th><th>점수</th><th>매수가</th><th>손절가</th><th>목표가</th><th>현재 전략</th><th>전략 에이전트 의견</th><th>상세</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in crypto_signal_snapshot.rows[:8] %}
+              <tr>
+                <td><strong class="ticker-symbol">{{ row.ticker }}</strong></td>
+                <td>{{ row.current_price_label or (row.current_price|money('KRW')) }}</td>
+                <td>{{ row.signal_score }}</td>
+                <td>{{ row.entry_zone_display or row.entry_zone_label }}</td>
+                <td>{{ row.stop_loss_label or (row.stop_loss|money('KRW') if row.stop_loss is not none else '-') }}</td>
+                <td>{{ row.take_profit_1_label or (row.take_profit_1|money('KRW') if row.take_profit_1 is not none else '-') }}</td>
+                <td><strong>{{ row.display_action or row.action }}</strong>{% if row.paper_execution_detail %}<div class="compact-meta">{{ row.paper_execution_detail }}</div>{% endif %}</td>
+                <td>{{ row.strategy_agent_opinion.thesis }}</td>
+                <td><a class="link-button compact-link" href="/signals/crypto/{{ row.ticker }}">상세 보기</a></td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <div class="empty compact">암호화폐 hourly snapshot에 표시할 행이 없습니다.</div>
+        {% endif %}
+        {% if crypto_signal_snapshot.paper_portfolio %}
+        <div class="trade-history-card">
+          <div class="panel-header compact-header">
+            <div>
+              <p class="eyebrow">체결 내역</p>
+              <h3>체결 내역</h3>
+              <p>언제 사고 팔았는지, 가격·금액·수익률만 확인합니다.</p>
+            </div>
+          </div>
+          <div class="table-wrap premium-table compact-signal-table">
+            <table>
+              <thead>
+                <tr><th>시간</th><th>코인</th><th>이벤트</th><th>가격</th><th>수량</th><th>금액</th><th>수수료</th><th>손익</th></tr>
+              </thead>
+              <tbody data-live-trades-body>
+                {% for trade in crypto_signal_snapshot.paper_portfolio.trade_history[:10] %}
+                <tr>
+                  <td>{{ trade.time }}</td>
+                  <td><strong class="ticker-symbol">{{ trade.ticker }}</strong></td>
+                  <td><strong>{{ trade.display_event or trade.event }}</strong></td>
+                  <td>{{ trade.price_label or (trade.price|money('KRW')) }}</td>
+                  <td>{{ trade.quantity_label or trade.quantity }}</td>
+                  <td>{{ trade.notional_label or (trade.notional|money('KRW')) }}</td>
+                  <td>{{ trade.fee_label or '0원' }}</td>
+                  <td>{{ trade.pnl_label }}</td>
+                </tr>
+                {% else %}
+                <tr><td colspan="8" class="empty">아직 매수/매도 체결 내역이 없습니다.</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        {% endif %}
+        {% else %}
+        <div class="empty compact">아직 생성된 암호화폐 모의투자 스냅샷이 없습니다. crypto hourly job이 생성하면 여기에 표시됩니다.</div>
+        {% endif %}
       </section>
+      {% endif %}
 
-      <section class="panel premium-panel filter-panel">
+      {% if active_dashboard.key in ['kospi', 'nasdaq'] %}
+      <details class="panel premium-panel filter-panel collapsible-filter">
+        <summary>
+          <span>
+            <em class="eyebrow">Filter</em>
+            <strong>필터 열기</strong>
+          </span>
+          <small>종목명, 날짜, 등급으로 좁혀보기</small>
+        </summary>
         <div class="panel-header">
           <div>
-            <p class="eyebrow">Command Center</p>
             <h2>필터</h2>
-            <p>티커, 시장, 날짜, 등급으로 저장된 분석 결과를 좁혀볼 수 있습니다.</p>
+            <p>종목명, 시장, 날짜, 등급으로 저장된 분석 결과를 좁혀볼 수 있습니다.</p>
           </div>
-          <a class="link-button secondary" href="/management">DB 관리</a>
         </div>
-        <form class="filter-grid command-grid" method="get" action="/">
-          <label>검색어<input name="query" value="{{ filters.query }}" placeholder="티커, run id, 요약" /></label>
-          <label>티커<input name="ticker" value="{{ filters.ticker }}" placeholder="예: 005930.KS" /></label>
+        <form class="filter-grid command-grid" method="get" action="{{ active_dashboard.href }}">
+          <label>검색어<input name="query" value="{{ filters.query }}" placeholder="종목명, 요약" /></label>
+          <label>종목<input name="ticker" value="{{ filters.ticker }}" placeholder="예: 삼성전자" /></label>
           <label>시장
             <select name="market">
               <option value="" {% if not filters.market %}selected{% endif %}>전체</option>
@@ -148,162 +472,227 @@
           <label>종료일<input type="date" name="trade_date_to" value="{{ filters.trade_date_to }}" /></label>
           <label class="checkbox"><input type="checkbox" name="latest_only" value="1" {% if filters.latest_only %}checked{% endif %} /> 종목별 최신만</label>
           <button type="submit">적용</button>
-          <a class="link-button secondary" href="/">초기화</a>
+          <a class="link-button secondary" href="{{ active_dashboard.href }}">초기화</a>
         </form>
-      </section>
-
-      <section id="batch" class="panel premium-panel batch-launcher">
-        <div class="panel-header">
-          <div>
-            <p class="eyebrow">Batch Runner</p>
-            <h2>새 배치 실행</h2>
-            <p>서버에서 TradingAgents batch를 바로 실행합니다. 긴 작업은 백그라운드 job으로 돌고 아래 실행 상태에서 추적합니다.</p>
-          </div>
-        </div>
-        <form id="batch-form" class="filter-grid command-grid">
-          <label>종목 입력<input name="tickers" placeholder="005930, 035720, 247540" required /></label>
-          <label>기준일<input type="date" name="trade_date" required /></label>
-          <label class="checkbox"><input type="checkbox" name="use_hermes_codex_auth" value="1" checked /> Hermes/Codex 인증 사용</label>
-          <label class="checkbox"><input type="checkbox" name="debug" value="1" /> 디버그 로그</label>
-          <button type="submit">배치 실행</button>
-          <p id="batch-form-status" class="muted-left"></p>
-        </form>
-      </section>
-
-      <section class="panel premium-panel">
-        <div class="panel-header">
-          <div>
-            <p class="eyebrow">Job Monitor</p>
-            <h2>실행 상태</h2>
-            <p>최근 batch job 상태입니다. 완료된 job의 run id는 상세 화면에서 확인할 수 있습니다.</p>
-          </div>
-        </div>
-        <div class="table-wrap premium-table">
-          <table>
-            <thead>
-              <tr><th>Job</th><th>상태</th><th>종목</th><th>기준일</th><th>완료/실패</th><th>생성</th><th>오류</th></tr>
-            </thead>
-            <tbody id="batch-jobs-body">
-              {% for job in batch_jobs %}
-              <tr data-job-id="{{ job.job_id }}">
-                <td class="mono">{{ job.job_id }}</td>
-                <td><span class="pill status-{{ job.status }}">{{ job.status }}</span></td>
-                <td>{{ job.tickers|join(', ') }}</td>
-                <td>{{ job.trade_date }}</td>
-                <td>{{ job.completed }} / {{ job.failed_count }}</td>
-                <td>{{ job.created_at }}</td>
-                <td class="summary">{{ job.error or '-' }}</td>
-              </tr>
-              {% else %}
-              <tr><td colspan="7" class="empty">아직 실행된 batch job이 없습니다.</td></tr>
-              {% endfor %}
-            </tbody>
-          </table>
-        </div>
-      </section>
+      </details>
 
       <section id="runs" class="panel premium-panel">
         <div class="panel-header">
           <div>
-            <p class="eyebrow">Research Ledger</p>
+            <p class="eyebrow">분석 목록</p>
             <h2>분석 실행 목록</h2>
-            <p>각 행은 저장된 TradingAgents 분석 결과 1건입니다. “종목별 최신만”을 켜면 같은 종목의 최신 run만 표시됩니다.</p>
+            <p>수익률, 판단, 액션, 핵심 근거만 빠르게 비교합니다. 내부 실행 메타는 숨겼습니다.</p>
           </div>
         </div>
-        <div class="table-wrap premium-table">
+        <div class="mobile-run-carousel" aria-label="모바일 분석 카드 목록">
+          {% for run in runs %}
+          <a class="mobile-run-card" href="/runs/{{ run.run_id }}">
+            <div class="mobile-run-card-top">
+              <strong>{{ run.display_label }}</strong>
+              <span class="pill pill-{{ run.rating|lower }}">{{ run.rating }}</span>
+            </div>
+            {% if run.return_summary.available %}
+            <div class="mobile-return-line">
+              <span class="{{ 'positive' if run.return_summary.strategy_return_percent >= 0 else 'negative' }}">{{ run.return_summary.strategy_return_label }}</span>
+              <em>1억원 {% if run.return_summary.pnl >= 0 %}+{% endif %}{{ run.return_summary.pnl_label }}</em>
+            </div>
+            {% endif %}
+            <p>{{ run.decision_summary }}</p>
+            <div class="mobile-run-card-bottom">
+              <span>{{ run.trade_date }}</span>
+              <strong>{{ run.trader_action }}</strong>
+            </div>
+          </a>
+          {% else %}
+          <div class="empty compact">조건에 맞는 실행 결과가 없습니다.</div>
+          {% endfor %}
+        </div>
+        <div class="table-wrap premium-table desktop-run-table">
           <table>
             <thead>
               <tr>
-                <th>종목</th><th>시장</th><th>기준일</th><th>최종 등급</th><th>액션</th><th>검증</th><th>소스</th><th>모델</th><th>판단 요약</th><th>생성 시각</th><th></th>
+                <th>종목</th><th>전략 수익률</th><th>판단</th><th>매매 액션</th><th>핵심 요약</th><th>업데이트</th><th></th>
               </tr>
             </thead>
             <tbody>
               {% for run in runs %}
               <tr>
-                <td><strong class="ticker-symbol">{{ run.display_label }}</strong></td>
-                <td><span class="pill">{{ run.market }}{% if run.exchange %}/{{ run.exchange }}{% endif %}</span></td>
-                <td>{{ run.trade_date }}</td>
-                <td><span class="pill pill-{{ run.rating|lower }}">{{ run.rating }}</span></td>
-                <td>{{ run.trader_action }}</td>
-                <td>{% if run.structured_report_verified %}<span class="pill verified">검증 리포트</span>{% else %}<span class="pill">원문</span>{% endif %}</td>
                 <td>
-                  {% if run.has_korean_news %}<span class="pill source">국내뉴스</span>{% endif %}
-                  {% if run.has_dart_disclosures %}<span class="pill source">DART</span>{% endif %}
-                  {% if not run.has_korean_news and not run.has_dart_disclosures %}<span class="muted-inline">-</span>{% endif %}
+                  <strong class="ticker-symbol">{{ run.display_label }}</strong>
+                  <div class="compact-meta">{{ run.trade_date }} · {{ run.market }}{% if run.exchange %}/{{ run.exchange }}{% endif %}</div>
                 </td>
-                <td class="mono">{{ run.quick_think_llm or '-' }} / {{ run.deep_think_llm or '-' }}</td>
-                <td class="summary">{{ run.decision_summary }}</td>
+                <td>
+                  {% if run.return_summary.available %}
+                  <div class="return-cell">
+                    <strong class="{{ 'positive' if run.return_summary.strategy_return_percent >= 0 else 'negative' }}">{{ run.return_summary.strategy_return_label }}</strong>
+                    <span>1억원 손익 {% if run.return_summary.pnl >= 0 %}+{% endif %}{{ run.return_summary.pnl_label }}</span>
+                    <em>단순보유 {{ run.return_summary.benchmark_return_label }} · 초과 {{ run.return_summary.excess_return_label }}</em>
+                  </div>
+                  {% else %}
+                  <span class="muted-inline">수익률 없음</span>
+                  {% endif %}
+                </td>
+                <td>
+                  <span class="pill pill-{{ run.rating|lower }}">{{ run.rating }}</span>
+                </td>
+                <td>{{ run.trader_action }}</td>
+                <td class="summary focused-summary">{{ run.decision_summary }}</td>
                 <td>{{ run.updated_label }}</td>
                 <td><a class="link-button" href="/runs/{{ run.run_id }}">상세 보기</a></td>
               </tr>
               {% else %}
-              <tr><td colspan="11" class="empty">조건에 맞는 실행 결과가 없습니다.</td></tr>
+              <tr><td colspan="7" class="empty">조건에 맞는 실행 결과가 없습니다.</td></tr>
               {% endfor %}
             </tbody>
           </table>
         </div>
       </section>
+      {% endif %}
     </main>
     <script>
-      const batchForm = document.getElementById('batch-form');
-      const batchStatus = document.getElementById('batch-form-status');
-      const jobsBody = document.getElementById('batch-jobs-body');
-
-      function escapeHtml(value) {
-        return String(value ?? '').replace(/[&<>'"]/g, (char) => ({
-          '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
-        }[char]));
-      }
-
-      function renderJobs(jobs) {
-        if (!jobs.length) {
-          jobsBody.innerHTML = '<tr><td colspan="7" class="empty">아직 실행된 batch job이 없습니다.</td></tr>';
-          return;
-        }
-        jobsBody.innerHTML = jobs.map((job) => `
-          <tr data-job-id="${escapeHtml(job.job_id)}">
-            <td class="mono">${escapeHtml(job.job_id)}</td>
-            <td><span class="pill status-${escapeHtml(job.status)}">${escapeHtml(job.status)}</span></td>
-            <td>${(job.tickers || []).map(escapeHtml).join(', ')}</td>
-            <td>${escapeHtml(job.trade_date)}</td>
-            <td>${escapeHtml(job.completed)} / ${escapeHtml(job.failed_count)}</td>
-            <td>${escapeHtml(job.created_at)}</td>
-            <td class="summary">${escapeHtml(job.error || '-')}</td>
+      (() => {
+        const panel = document.querySelector('[data-live-pnl]');
+        if (!panel) return;
+        const setText = (selector, value) => {
+          document.querySelectorAll(selector).forEach(node => { if (value !== undefined && value !== null) node.textContent = value; });
+        };
+        const escapeHtml = (value) => String(value ?? '').replace(/[&<>'"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[ch]));
+        const renderLiveAssets = (positions) => {
+          const body = document.querySelector('[data-live-assets-body]');
+          if (!body || !Array.isArray(positions)) return;
+          if (!positions.length) {
+            body.innerHTML = '<tr><td colspan="7" class="empty">현재 보유 자산이 없습니다.</td></tr>';
+            return;
+          }
+          body.innerHTML = positions.map(position => `<tr>
+            <td><strong class="ticker-symbol">${escapeHtml(position.ticker)}</strong></td>
+            <td>${escapeHtml(position.quantity_label || position.quantity)}</td>
+            <td>${escapeHtml(position.entry_price_label || position.entry_price)}</td>
+            <td>${escapeHtml(position.current_price_label || position.current_price)}</td>
+            <td>${escapeHtml(position.market_value_label || position.market_value)}</td>
+            <td>${escapeHtml(position.unrealized_pnl_label || '-')}</td>
+            <td>${escapeHtml(position.unrealized_return_label || '-')}</td>
           </tr>`).join('');
-      }
-
-      async function refreshJobs() {
-        const response = await fetch('/api/batch-jobs?limit=10');
-        if (!response.ok) return;
-        const payload = await response.json();
-        renderJobs(payload.jobs || []);
-      }
-
-      batchForm.addEventListener('submit', async (event) => {
-        event.preventDefault();
-        const form = new FormData(batchForm);
-        batchStatus.textContent = '배치 job 생성 중...';
-        const response = await fetch('/api/batch-jobs', {
-          method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({
-            tickers: form.get('tickers'),
-            trade_date: form.get('trade_date'),
-            use_hermes_codex_auth: form.has('use_hermes_codex_auth'),
-            debug: form.has('debug'),
-          }),
-        });
-        if (!response.ok) {
-          const payload = await response.json().catch(() => ({}));
-          batchStatus.textContent = `실행 실패: ${payload.detail || response.status}`;
-          return;
+        };
+        const renderLiveTrades = (trades) => {
+          const body = document.querySelector('[data-live-trades-body]');
+          if (!body || !Array.isArray(trades)) return;
+          const fills = trades.filter(trade => {
+            const event = String(trade.display_event || trade.event || '');
+            return event.includes('매수') || event.includes('매도') || event.includes('익절') || event.includes('손절');
+          }).slice(0, 10);
+          if (!fills.length) {
+            body.innerHTML = '<tr><td colspan="8" class="empty">아직 매수/매도 체결 내역이 없습니다.</td></tr>';
+            return;
+          }
+          body.innerHTML = fills.map(trade => `<tr>
+            <td>${escapeHtml(trade.time || '-')}</td>
+            <td><strong class="ticker-symbol">${escapeHtml(trade.ticker)}</strong></td>
+            <td><strong>${escapeHtml(trade.display_event || trade.event)}</strong></td>
+            <td>${escapeHtml(trade.price_label || trade.price)}</td>
+            <td>${escapeHtml(trade.quantity_label || trade.quantity)}</td>
+            <td>${escapeHtml(trade.notional_label || trade.notional)}</td>
+            <td>${escapeHtml(trade.fee_label || '0원')}</td>
+            <td>${escapeHtml(trade.pnl_label || '-')}</td>
+          </tr>`).join('');
+        };
+        async function refreshLivePnl() {
+          try {
+            const response = await fetch(panel.dataset.livePnl, { cache: 'no-store' });
+            if (!response.ok) return;
+            const data = await response.json();
+            setText('[data-live-return]', data.return_label);
+            setText('[data-live-pnl-label]', data.total_pnl_label || data.pnl_label);
+            setText('[data-live-status]', data.profit_status_label);
+            setText('[data-live-portfolio-value]', data.portfolio_value_label || data.portfolio_value);
+            setText('[data-live-fees]', data.total_fees_label);
+            renderLiveAssets(data.positions);
+            renderLiveTrades(data.trade_history);
+          } catch (_) {}
         }
-        const job = await response.json();
-        batchStatus.textContent = `배치 job 생성됨: ${job.job_id}`;
-        await refreshJobs();
-      });
-
-      setInterval(refreshJobs, 5000);
+        async function refreshChart() {
+          const chart = document.querySelector('[data-chart-endpoint]');
+          const canvas = document.querySelector('.crypto-chart-canvas');
+          if (!chart || !canvas) return;
+          try {
+            const response = await fetch(chart.dataset.chartEndpoint, { cache: 'no-store' });
+            if (!response.ok) return;
+            const data = await response.json();
+            const candles = Array.isArray(data.candles) ? data.candles.slice(-60) : [];
+            if (!candles.length) { canvas.textContent = '차트 데이터 없음'; return; }
+            const lows = candles.map(c => Number(c.low || c.close)).filter(Number.isFinite);
+            const highs = candles.map(c => Number(c.high || c.close)).filter(Number.isFinite);
+            const min = Math.min(...lows);
+            const max = Math.max(...highs);
+            const span = Math.max(max - min, 1e-9);
+            const width = 760;
+            const priceHeight = 292;
+            const volumeHeight = 58;
+            const timeAxisHeight = 30;
+            const padL = 54;
+            const padR = 82;
+            const padT = 14;
+            const plotW = width - padL - padR;
+            const y = (value) => padT + ((max - Number(value)) / span) * (priceHeight - 28);
+            const x = (idx) => padL + (candles.length === 1 ? plotW / 2 : (idx / (candles.length - 1)) * plotW);
+            const candleW = Math.max(3, Math.min(9, plotW / candles.length * 0.62));
+            const fmt = (value) => Number(value).toLocaleString('ko-KR', { maximumFractionDigits: 0 });
+            const fmtTime = (c) => {
+              const raw = c.time || c.close_time || c.open_time || c.timestamp;
+              let d = null;
+              if (typeof raw === 'number' || /^\d+$/.test(String(raw || ''))) {
+                const n = Number(raw);
+                d = new Date(n > 1e12 ? n : n * 1000);
+              } else if (raw) {
+                d = new Date(raw);
+              }
+              if (d && !Number.isNaN(d.getTime())) return d.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false });
+              return String(raw || '').slice(11, 16) || '-';
+            };
+            const volumes = candles.map(c => Number(c.volume || 0));
+            const maxVol = Math.max(...volumes, 1);
+            const grid = [0, 0.25, 0.5, 0.75, 1].map(r => {
+              const price = max - span * r;
+              const gy = y(price);
+              return `<line class="chart-grid" x1="${padL}" x2="${width - padR}" y1="${gy.toFixed(1)}" y2="${gy.toFixed(1)}"></line><text class="chart-price-axis chart-axis-label" x="${width - padR + 10}" y="${(gy + 4).toFixed(1)}">${fmt(price)}</text>`;
+            }).join('');
+            const timeIndexes = [0, 0.25, 0.5, 0.75, 1].map(r => Math.min(candles.length - 1, Math.max(0, Math.round((candles.length - 1) * r))));
+            const uniqueTimeIndexes = [...new Set(timeIndexes)];
+            const timeAxisY = priceHeight + volumeHeight + 18;
+            const timeAxis = uniqueTimeIndexes.map(idx => {
+              const tx = x(idx);
+              return `<line class="chart-time-tick" x1="${tx.toFixed(1)}" x2="${tx.toFixed(1)}" y1="${priceHeight + volumeHeight + 2}" y2="${priceHeight + volumeHeight + 7}"></line><text class="chart-time-label" x="${tx.toFixed(1)}" y="${timeAxisY}">${fmtTime(candles[idx])}</text>`;
+            }).join('') + `<text class="chart-axis-title chart-time-title" x="${padL}" y="${priceHeight + volumeHeight + 27}">시간축</text>`;
+            const bodies = candles.map((c, idx) => {
+              const open = Number(c.open ?? c.close);
+              const close = Number(c.close ?? c.open);
+              const high = Number(c.high ?? Math.max(open, close));
+              const low = Number(c.low ?? Math.min(open, close));
+              const cx = x(idx);
+              const up = close >= open;
+              const cls = up ? 'up' : 'down';
+              const top = Math.min(y(open), y(close));
+              const h = Math.max(Math.abs(y(open) - y(close)), 1.5);
+              const volH = Math.max(1, (Number(c.volume || 0) / maxVol) * volumeHeight);
+              return `<g class="chart-candle ${cls}"><line x1="${cx.toFixed(1)}" x2="${cx.toFixed(1)}" y1="${y(high).toFixed(1)}" y2="${y(low).toFixed(1)}"></line><rect x="${(cx - candleW / 2).toFixed(1)}" y="${top.toFixed(1)}" width="${candleW.toFixed(1)}" height="${h.toFixed(1)}" rx="1"></rect><rect class="chart-volume" x="${(cx - candleW / 2).toFixed(1)}" y="${(priceHeight + volumeHeight - volH).toFixed(1)}" width="${candleW.toFixed(1)}" height="${volH.toFixed(1)}"></rect></g>`;
+            }).join('');
+            const levelLine = (value, cls, label) => {
+              const n = Number(value);
+              if (!Number.isFinite(n) || n < min || n > max) return '';
+              const ly = y(n);
+              return `<line class="chart-level ${cls}" x1="${padL}" x2="${width - padR}" y1="${ly.toFixed(1)}" y2="${ly.toFixed(1)}"></line><text class="chart-level-label ${cls}" x="${padL + 6}" y="${(ly - 4).toFixed(1)}">${label} ${fmt(n)}</text>`;
+            };
+            const levels = data.levels || {};
+            const levelMarkup = [levelLine(levels.entry_low, 'entry', '진입'), levelLine(levels.take_profit_1, 'target', '목표'), levelLine(levels.stop_loss, 'stop', '손절')].join('');
+            const last = candles[candles.length - 1];
+            canvas.innerHTML = `<div class="crypto-candlestick-chart"><svg viewBox="0 0 ${width} ${priceHeight + volumeHeight + timeAxisHeight}" role="img" aria-label="BTC-USD 캔들 가격축 시간축 차트">${grid}${bodies}${levelMarkup}${timeAxis}<text class="chart-axis-title" x="${width - padR + 10}" y="16">가격축</text></svg><div class="chart-caption"><strong>${data.ticker}</strong><span>현재 ${fmt(last.close)} · 고가 ${fmt(max)} · 저가 ${fmt(min)}</span></div></div>`;
+          } catch (_) {}
+        }
+        refreshLivePnl();
+        refreshChart();
+        setInterval(refreshLivePnl, 30000);
+        setInterval(refreshChart, 60000);
+      })();
     </script>
   </body>
 </html>

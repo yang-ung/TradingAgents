@@ -1,4 +1,5 @@
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+import json
 
 from tradingagents.agents.utils.agent_utils import (
     build_instrument_context,
@@ -52,6 +53,36 @@ Return a report with these sections:
 """
 
 
+def _render_reanalysis_context(context):
+    if not isinstance(context, dict) or not context:
+        return ""
+    safe_context = {
+        "action": context.get("action"),
+        "attempt": context.get("attempt"),
+        "previous_strategy_spec": context.get("previous_strategy_spec"),
+        "reanalysis_request": context.get("reanalysis_request"),
+        "diagnostics": context.get("diagnostics"),
+        "pre_live_failure_reasons": (context.get("pre_live_validation") or {}).get("failure_reasons")
+        if isinstance(context.get("pre_live_validation"), dict)
+        else None,
+    }
+    payload = json.dumps(safe_context, ensure_ascii=False, indent=2, default=str)
+    return f"""
+
+Reanalysis mode is active. The deterministic program has already rejected or blocked the previous StrategySpec and is asking you to revise it.
+Use the diagnostics below as hard constraints, not optional UI commentary.
+- First classify the strategy horizon/type: long-term holding, swing, day-trading, or defensive/cash-waiting.
+- If trade_count is too low or entry_touch_percent is below the threshold, widen or redesign the entry logic; prefer dynamic MA/ATR/support rules over stale fixed prices when appropriate.
+- Emit a new validated StrategySpec JSON block. Do not merely explain that reanalysis is needed.
+- The new StrategySpec is still only a candidate; the program will backtest and validate it after your response.
+
+Program reanalysis payload:
+```json
+{payload}
+```
+"""
+
+
 def create_quant_strategy_analyst(llm):
     def quant_strategy_analyst_node(state):
         current_date = state["trade_date"]
@@ -59,9 +90,13 @@ def create_quant_strategy_analyst(llm):
         tools = [get_stock_data, get_indicators]
         price_timing_policy = build_price_timing_policy()
 
+        reanalysis_context = state.get("reanalysis_context") or {}
+        context_block = _render_reanalysis_context(reanalysis_context)
+
         system_message = (
             QUANT_STRATEGY_SYSTEM_MESSAGE
             + price_timing_policy.render_prompt_block()
+            + context_block
             + get_language_instruction()
         )
 

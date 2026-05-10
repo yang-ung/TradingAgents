@@ -9,7 +9,11 @@ from typing import Iterable, List, Optional
 from tradingagents.default_config import DEFAULT_CONFIG
 from tradingagents.graph.trading_graph import TradingAgentsGraph
 from tradingagents.ticker_utils import normalize_ticker_symbol
+from tradingagents.validation.pre_live import build_pre_live_validation_report
+from tradingagents.validation.reanalysis import run_reanalysis_if_required
 
+from .backtest import build_strategy_backtest
+from .charts import get_price_chart
 from .extract import build_analysis_record, utc_now_iso
 from .models import BatchSummary
 from .storage import AnalysisRepository
@@ -50,6 +54,9 @@ def run_batch_analysis(
     artifact_dir: str | Path = DEFAULT_ARTIFACT_DIR,
     use_hermes_codex_auth: bool = False,
     debug: bool = False,
+    enable_reanalysis: bool = True,
+    reanalysis_agent_runner=None,
+    chart_provider=get_price_chart,
 ) -> BatchSummary:
     tickers = [normalize_ticker_symbol(ticker) for ticker in tickers]
     artifact_dir = Path(artifact_dir)
@@ -62,6 +69,8 @@ def run_batch_analysis(
     graph = TradingAgentsGraph(debug=debug, config=config)
 
     completed = 0
+    reanalysis_completed = 0
+    reanalysis_failed = []
     failed = []
     run_ids: List[str] = []
 
@@ -79,11 +88,37 @@ def run_batch_analysis(
                     "llm_provider": config["llm_provider"],
                     "quick_think_llm": config["quick_think_llm"],
                     "deep_think_llm": config["deep_think_llm"],
+                    "artifact_dir": str(artifact_dir),
+                    "openai_use_hermes_codex_auth": use_hermes_codex_auth,
                 },
             )
             stored = repository.save(record)
             run_ids.append(stored["run_id"])
             completed += 1
+            if enable_reanalysis:
+                try:
+                    chart = chart_provider(ticker, trade_date)
+                    backtest = build_strategy_backtest(stored, chart)
+                    pre_live = build_pre_live_validation_report(backtest)
+                    reanalysis = run_reanalysis_if_required(
+                        stored,
+                        chart,
+                        pre_live,
+                        agent_runner=reanalysis_agent_runner,
+                    )
+                    if reanalysis.get("triggered"):
+                        stored["reanalysis_execution"] = reanalysis
+                        repository.save(stored)
+                        for attempt in reanalysis.get("attempts") or []:
+                            revised_record = attempt.get("record") if isinstance(attempt, dict) else None
+                            if isinstance(revised_record, dict) and attempt.get("status") == "completed":
+                                saved_revised = repository.save(revised_record)
+                                run_ids.append(saved_revised["run_id"])
+                                reanalysis_completed += 1
+                        if reanalysis.get("status") not in {"completed", "max_attempts_reached"}:
+                            reanalysis_failed.append({"ticker": ticker, "status": reanalysis.get("status")})
+                except Exception as exc:  # pragma: no cover - live data/LLM path
+                    reanalysis_failed.append({"ticker": ticker, "error": str(exc)})
         except Exception as exc:  # pragma: no cover - exercised by live runs
             failed.append(
                 {
@@ -100,6 +135,8 @@ def run_batch_analysis(
         "completed": completed,
         "failed": failed,
         "run_ids": run_ids,
+        "reanalysis_completed": reanalysis_completed,
+        "reanalysis_failed": reanalysis_failed,
     }
 
 

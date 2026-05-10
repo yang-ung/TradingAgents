@@ -99,6 +99,40 @@ def test_pre_live_validation_report_fails_closed_for_low_sample_and_severe_marke
     assert report["live_capital_allowed"] is False
     assert "표본 부족" in report["failure_reasons"]
     assert "시장 공통 리스크 매우 부정" in report["failure_reasons"]
+    assert report["reanalysis_required"] is True
+    assert report["reanalysis_request"]["agent"] == "quant_strategy_analyst"
+    assert "거래 표본 부족" in report["reanalysis_request"]["reasons"]
+
+
+@pytest.mark.unit
+def test_pre_live_validation_requests_reanalysis_when_entry_touch_frequency_is_too_low():
+    from tradingagents.validation.pre_live import build_pre_live_validation_report
+
+    backtest = {
+        "available": True,
+        "periods": {
+            "전체": {
+                "benchmark_return_percent": 0.0,
+                "entry_touch_percent": 4.0,
+                "entry_touch_days": 5,
+                "sample_days": 125,
+                "trades": [{"return_percent": 4.0} for _ in range(30)],
+            }
+        },
+    }
+
+    report = build_pre_live_validation_report(
+        backtest,
+        config=ValidationConfig(min_trades=30, min_win_rate_percent=0, min_profit_factor=0, max_drawdown_percent=100),
+    )
+
+    assert report["status_label"] == "재분석 필요"
+    assert report["lifecycle_status"] == "reanalysis_required"
+    assert report["paper_trading_candidate"] is False
+    assert "진입 접촉 빈도 부족" in report["failure_reasons"]
+    assert report["reanalysis_required"] is True
+    assert report["reanalysis_request"]["agent"] == "quant_strategy_analyst"
+    assert "진입 조건이 너무 좁아 시장에서 거의 실행되지 않음" in report["reanalysis_request"]["reasons"]
 
 
 @pytest.mark.unit
