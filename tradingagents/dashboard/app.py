@@ -1594,11 +1594,67 @@ def create_dashboard_app(
     }
 
     def _dashboard_nav() -> list[dict[str, Any]]:
-        return [*dashboard_profiles.values(), self_feedback_profile]
+        return list(dashboard_profiles.values())
 
     def _normalize_dashboard(dashboard: Optional[str]) -> str:
         key = (dashboard or "summary").strip().lower()
         return key if key in dashboard_profiles else "summary"
+
+    def _self_feedback_repositories() -> list[AnalysisRepository]:
+        repositories = [repository]
+        for sibling_name in ("dashboard", "dashboard-pilot-20260430"):
+            sibling_dir = repository.base_dir.parent / sibling_name
+            if sibling_dir == repository.base_dir or not sibling_dir.exists():
+                continue
+            try:
+                repositories.append(AnalysisRepository(sibling_dir))
+            except Exception:
+                continue
+        return repositories
+
+    def _loop_asset_bucket(loop: dict[str, Any]) -> str:
+        ticker_text = str(loop.get("ticker") or "").upper()
+        if ticker_text.endswith((".KS", ".KQ")) or ticker_text[:6].isdigit():
+            return "kospi"
+        if "USDT" in ticker_text or "/USDT" in ticker_text or ticker_text in {"BTC", "ETH", "SOL", "BNB", "XRP"}:
+            return "crypto"
+        return "nasdaq"
+
+    def _list_strategy_self_feedback_loops_for_dashboard(
+        *,
+        dashboard_key: str | None = None,
+        ticker: str | None = None,
+        limit: int = 20,
+    ) -> list[dict[str, Any]]:
+        merged: dict[str, dict[str, Any]] = {}
+        for repo in _self_feedback_repositories():
+            try:
+                loops = repo.list_strategy_self_feedback_loops(ticker=ticker, limit=None)
+            except Exception:
+                continue
+            for loop in loops:
+                if not isinstance(loop, dict):
+                    continue
+                loop_id = str(loop.get("loop_id") or "")
+                if not loop_id:
+                    continue
+                loop["live_capital_allowed"] = False
+                if dashboard_key in {"kospi", "nasdaq", "crypto"} and _loop_asset_bucket(loop) != dashboard_key:
+                    continue
+                merged[loop_id] = loop
+        ordered = sorted(merged.values(), key=lambda item: str(item.get("generated_at") or ""), reverse=True)
+        return ordered[: max(0, int(limit))]
+
+    def _get_strategy_self_feedback_loop(loop_id: str) -> dict[str, Any] | None:
+        for repo in _self_feedback_repositories():
+            try:
+                loop = repo.get_strategy_self_feedback_loop(loop_id)
+            except Exception:
+                loop = None
+            if isinstance(loop, dict):
+                loop["live_capital_allowed"] = False
+                return loop
+        return None
 
     @app.get("/", response_class=HTMLResponse)
     @app.get("/dashboards/{dashboard}", response_class=HTMLResponse)
@@ -1661,6 +1717,10 @@ def create_dashboard_app(
         crypto_signal_snapshot = _load_crypto_signal_snapshot(repository.base_dir)
         hourly_report = _load_hourly_report(repository.base_dir)
         cross_market_context = _load_cross_market_context(repository)
+        strategy_self_feedback_loops = _list_strategy_self_feedback_loops_for_dashboard(
+            dashboard_key=active_dashboard_key,
+            limit=5,
+        )
         return templates.TemplateResponse(
             request,
             "index.html",
@@ -1689,6 +1749,7 @@ def create_dashboard_app(
                 "crypto_signal_snapshot": crypto_signal_snapshot,
                 "hourly_report": hourly_report,
                 "cross_market_context": cross_market_context,
+                "strategy_self_feedback_loops": strategy_self_feedback_loops,
                 "dashboard_nav": _dashboard_nav(),
                 "active_dashboard": active_dashboard,
             },
@@ -1700,9 +1761,7 @@ def create_dashboard_app(
         ticker: Optional[str] = None,
         limit: int = Query(20, ge=1, le=100),
     ):
-        loops = repository.list_strategy_self_feedback_loops(ticker=ticker, limit=limit)
-        for loop in loops:
-            loop["live_capital_allowed"] = False
+        loops = _list_strategy_self_feedback_loops_for_dashboard(ticker=ticker, limit=limit)
         return templates.TemplateResponse(
             request,
             "self_feedback.html",
@@ -1719,16 +1778,15 @@ def create_dashboard_app(
 
     @app.get("/strategy-self-feedback/{loop_id}", response_class=HTMLResponse)
     def strategy_self_feedback_detail(request: Request, loop_id: str):
-        loop = repository.get_strategy_self_feedback_loop(loop_id)
+        loop = _get_strategy_self_feedback_loop(loop_id)
         if loop is None:
             raise HTTPException(status_code=404, detail=f"Unknown strategy self-feedback loop: {loop_id}")
-        loop["live_capital_allowed"] = False
         return templates.TemplateResponse(
             request,
             "self_feedback.html",
             {
                 "mode": "detail",
-                "loops": repository.list_strategy_self_feedback_loops(ticker=loop.get("ticker"), limit=20),
+                "loops": _list_strategy_self_feedback_loops_for_dashboard(ticker=loop.get("ticker"), limit=20),
                 "loop_detail": loop,
                 "ticker": loop.get("ticker") or "",
                 "limit": 20,
@@ -1988,15 +2046,14 @@ def create_dashboard_app(
         ticker: Optional[str] = None,
         limit: int = Query(20, ge=1, le=100),
     ):
-        loops = repository.list_strategy_self_feedback_loops(ticker=ticker, limit=limit)
+        loops = _list_strategy_self_feedback_loops_for_dashboard(ticker=ticker, limit=limit)
         return {"total": len(loops), "limit": limit, "ticker": ticker, "loops": loops}
 
     @app.get("/api/strategy-self-feedback/{loop_id}")
     def api_strategy_self_feedback_loop(loop_id: str):
-        loop = repository.get_strategy_self_feedback_loop(loop_id)
+        loop = _get_strategy_self_feedback_loop(loop_id)
         if loop is None:
             raise HTTPException(status_code=404, detail=f"Unknown strategy self-feedback loop: {loop_id}")
-        loop["live_capital_allowed"] = False
         return loop
 
     @app.get("/api/runs/{run_id}")

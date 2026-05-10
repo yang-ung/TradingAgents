@@ -186,6 +186,37 @@
       </section>
       {% endif %}
 
+      {% if active_dashboard.key in ['kospi', 'nasdaq', 'crypto'] %}
+      <section class="panel premium-panel self-feedback-summary-panel" aria-label="N회 루프 전략 개선 테스트">
+        <div class="panel-header split">
+          <div>
+            <p class="eyebrow">전략 개선 루프</p>
+            <h2>N회 루프 테스트</h2>
+            <p>이 자산군에서 실행한 셀프 피드백 루프의 반복별 전략, 매수·매도 이력, 검증 피드백을 확인합니다.</p>
+          </div>
+          <a class="link-button compact-link" href="/strategy-self-feedback">전체 루프 보기</a>
+        </div>
+        <div class="return-leaderboard-grid">
+          {% for item in strategy_self_feedback_loops %}
+          <a class="return-leaderboard-card" href="/strategy-self-feedback/{{ item.loop_id }}">
+            <div class="return-rank">{{ item.completed_iterations or 0 }}/{{ item.requested_iterations or 0 }}</div>
+            <div class="return-main">
+              <strong>{{ item.ticker or '-' }}</strong>
+              <span>{{ item.trade_date or '-' }} · 최고 {{ item.best_iteration or '-' }}회차 · {{ item.generated_at or '-' }}</span>
+            </div>
+            <div class="return-metrics">
+              <strong>반복 상세 보기</strong>
+              <span>live_capital_allowed=False</span>
+              <em>{{ item.loop_id }}</em>
+            </div>
+          </a>
+          {% else %}
+          <div class="empty compact">이 자산군에 표시할 N회 루프 테스트 이력이 아직 없습니다.</div>
+          {% endfor %}
+        </div>
+      </section>
+      {% endif %}
+
       {% if active_dashboard.key == 'etf' %}
       <section class="panel premium-panel signal-price-table-panel" aria-label="자동매매 가격표">
         <div class="panel-header split">

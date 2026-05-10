@@ -249,3 +249,38 @@ def test_dashboard_self_feedback_page_renders_iterations_trades_and_feedback(tmp
     assert "stop_loss" in detail_page.text
     assert "진입 조건이 너무 좁아" in detail_page.text
     assert "live_capital_allowed=False" in detail_page.text
+
+
+@pytest.mark.unit
+def test_dashboard_asset_tabs_embed_self_feedback_loops_from_sibling_archive(tmp_path):
+    from tradingagents.dashboard.app import create_dashboard_app
+    from tradingagents.dashboard.storage import AnalysisRepository
+
+    active_dir = tmp_path / "dashboard-pilot-20260430"
+    archive_dir = tmp_path / "dashboard"
+    AnalysisRepository(active_dir)
+    AnalysisRepository(archive_dir).save_strategy_self_feedback_loop({
+        "loop_id": "kospi-loop-10x",
+        "loop_type": "strategy_self_feedback",
+        "ticker": "005930.KS",
+        "trade_date": "2026-05-08",
+        "generated_at": "2026-05-10T14:34:39+00:00",
+        "requested_iterations": 10,
+        "completed_iterations": 10,
+        "best_iteration": 6,
+        "live_capital_allowed": False,
+        "iterations": [{"iteration": 1}],
+    })
+    client = TestClient(create_dashboard_app(active_dir))
+
+    kospi_page = client.get("/dashboards/kospi")
+    nasdaq_page = client.get("/dashboards/nasdaq")
+    api_response = client.get("/api/strategy-self-feedback")
+
+    assert kospi_page.status_code == 200
+    assert "N회 루프 테스트" in kospi_page.text
+    assert "kospi-loop-10x" in kospi_page.text
+    assert "10/10" in kospi_page.text
+    assert "kospi-loop-10x" not in nasdaq_page.text
+    assert 'href="/strategy-self-feedback"' not in kospi_page.text.split('aria-label="대시보드 구분"', 1)[1].split("</nav>", 1)[0]
+    assert api_response.json()["total"] == 1
