@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>10회 셀프 피드백 루프 · TradingAgents</title>
+    <style>
+      html { background: #07070b; }
+      body { margin: 0; min-height: 100vh; background: #07070b; color: #f7f8ff; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif; }
+      .page { max-width: 1520px; margin: 0 auto; padding: 28px 24px 88px; }
+      .self-feedback-grid { display: grid; gap: 18px; }
+      .loop-summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
+      .loop-summary-card, .iteration-card { border: 1px solid rgba(255,255,255,.12); border-radius: 20px; padding: 18px; background: rgba(255,255,255,.045); }
+      .iteration-card.best { border-color: rgba(108, 240, 192, .7); box-shadow: 0 0 0 1px rgba(108, 240, 192, .15); }
+      .metric-strip { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+      .metric-strip span, .tag { display: inline-flex; gap: 4px; align-items: center; border: 1px solid rgba(255,255,255,.12); border-radius: 999px; padding: 6px 10px; color: #cfd5ff; background: rgba(255,255,255,.04); font-size: 12px; }
+      .strategy-box { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; margin: 12px 0; }
+      .strategy-box div { border: 1px solid rgba(255,255,255,.08); border-radius: 14px; padding: 10px; background: rgba(0,0,0,.16); }
+      .feedback-list, .basis-list { margin: 8px 0 0 18px; color: #d9defd; }
+      .json-details summary { cursor: pointer; color: #9fb3ff; margin-top: 10px; }
+      .json-details pre { overflow: auto; white-space: pre-wrap; border-radius: 14px; padding: 12px; background: rgba(0,0,0,.35); color: #d9defd; }
+    </style>
+    <link rel="stylesheet" href="/static/dashboard.css?v=20260510-self-feedback" />
+  </head>
+  <body>
+    <main class="page service-dashboard">
+      <header class="service-hero">
+        <div class="service-hero-main">
+          <div class="topline"><span class="brand-mark">TA</span><span>TradingAgents Intelligence</span></div>
+          <p class="eyebrow">{{ active_dashboard.eyebrow }}</p>
+          <h1>10회 셀프 피드백 루프</h1>
+          <p class="hero-description">전략을 반복 수정한 이력, 각 반복의 StrategySpec, 백테스트 매수·매도 이벤트, 실패/재분석 피드백을 한 화면에서 확인합니다.</p>
+        </div>
+      </header>
+
+      <nav class="dashboard-tabs" aria-label="대시보드 구분">
+        {% for item in dashboard_nav %}
+        <a class="dashboard-tab dashboard-tab-{{ item.accent }} {% if item.key == active_dashboard.key %}active{% endif %}" href="{{ item.href }}" {% if item.key == active_dashboard.key %}aria-current="page"{% endif %}>
+          <span class="dashboard-tab-icon" aria-hidden="true">{{ item.icon }}</span>
+          <span class="dashboard-tab-body">
+            <strong>{{ item.title }}</strong>
+            <span class="dashboard-tab-short">{{ item.short_label }}</span>
+            <em class="dashboard-tab-meta">{{ item.meta }}</em>
+            <span>{{ item.description }}</span>
+          </span>
+        </a>
+        {% endfor %}
+      </nav>
+
+      <section class="panel premium-panel">
+        <div class="panel-header split">
+          <div>
+            <p class="eyebrow">Loop Archive</p>
+            <h2>저장된 셀프 피드백 루프</h2>
+            <p>API도 같이 제공됩니다: <code>/api/strategy-self-feedback</code>, <code>/api/strategy-self-feedback/{loop_id}</code></p>
+          </div>
+          <form method="get" action="/strategy-self-feedback" class="filter-form compact-filter-form">
+            <label>종목 <input name="ticker" value="{{ ticker }}" placeholder="005930.KS" /></label>
+            <button type="submit">조회</button>
+          </form>
+        </div>
+        <div class="loop-summary-grid">
+          {% for item in loops %}
+          <a class="loop-summary-card" href="/strategy-self-feedback/{{ item.loop_id }}">
+            <strong>{{ item.ticker or '-' }}</strong>
+            <p>{{ item.trade_date or '-' }} · {{ item.completed_iterations or 0 }}/{{ item.requested_iterations or 0 }}회 완료 · 최고 {{ item.best_iteration or '-' }}회차</p>
+            <div class="metric-strip">
+              <span>loop_id {{ item.loop_id }}</span>
+              <span>live_capital_allowed=False</span>
+            </div>
+          </a>
+          {% else %}
+          <div class="empty compact">저장된 10회 셀프 피드백 루프가 없습니다.</div>
+          {% endfor %}
+        </div>
+      </section>
+
+      {% if loop_detail %}
+      <section class="panel premium-panel self-feedback-grid">
+        <div class="panel-header split">
+          <div>
+            <p class="eyebrow">Loop Detail</p>
+            <h2>반복별 전략·매매·피드백</h2>
+            <p>{{ loop_detail.ticker }} · {{ loop_detail.trade_date }} · {{ loop_detail.completed_iterations }}/{{ loop_detail.requested_iterations }}회 완료</p>
+          </div>
+          <div class="score-badge"><span>최고 회차</span><strong>{{ loop_detail.best_iteration or '-' }}</strong><em>live_capital_allowed=False</em></div>
+        </div>
+        <div class="metric-strip">
+          <span>loop_id {{ loop_detail.loop_id }}</span>
+          <span>생성 {{ loop_detail.generated_at or '-' }}</span>
+          <span>실전 허가 차단 {{ loop_detail.live_capital_allowed }}</span>
+        </div>
+
+        {% for iteration in loop_detail.iterations %}
+        {% set spec = iteration.strategy_spec or {} %}
+        {% set backtest = iteration.backtest or {} %}
+        {% set validation = iteration.pre_live_validation or {} %}
+        {% set metrics = validation.metrics or {} %}
+        {% set feedback = iteration.feedback or {} %}
+        <article class="iteration-card {% if iteration.iteration == loop_detail.best_iteration %}best{% endif %}">
+          <div class="panel-header split">
+            <div>
+              <p class="eyebrow">Iteration {{ iteration.iteration }} · {{ iteration.status }}</p>
+              <h3>{{ spec.strategy_id or iteration.error_type or '전략 없음' }}</h3>
+              <p>{{ validation.status_label or iteration.error or '검증 결과 없음' }}</p>
+            </div>
+            {% if iteration.iteration == loop_detail.best_iteration %}<span class="tag">선택된 최고 전략</span>{% endif %}
+          </div>
+
+          <div class="strategy-box">
+            <div><strong>진입</strong><br />{{ spec.entry or '-' }}</div>
+            <div><strong>익절</strong><br />{{ spec.take_profit or '-' }}</div>
+            <div><strong>손절</strong><br />{{ spec.stop_loss or '-' }}</div>
+            <div><strong>점수</strong><br />{{ iteration.score if iteration.score is not none else '-' }}</div>
+          </div>
+
+          <div class="metric-strip">
+            <span>수익률 {{ backtest.strategy_return_percent if backtest.strategy_return_percent is not none else metrics.total_return_percent|default('-', true) }}%</span>
+            <span>거래 {{ backtest.trade_count if backtest.trade_count is not none else metrics.trade_count|default('-', true) }}회</span>
+            <span>진입 접촉 {{ backtest.entry_touch_percent|default('-', true) }}%</span>
+            <span>Profit Factor {{ metrics.profit_factor|default('-', true) }}</span>
+            <span>MDD {{ metrics.max_drawdown_percent|default('-', true) }}%</span>
+          </div>
+
+          {% if spec.basis %}
+          <h4>전략 근거</h4>
+          <ul class="basis-list">{% for reason in spec.basis %}<li>{{ reason }}</li>{% endfor %}</ul>
+          {% endif %}
+
+          <h4>매수·매도 이력</h4>
+          {% if backtest.trades %}
+          <div class="table-wrap premium-table compact-signal-table">
+            <table>
+              <thead><tr><th>매수일</th><th>매수가</th><th>매도일</th><th>매도가</th><th>사유</th><th>수익률</th></tr></thead>
+              <tbody>
+                {% for trade in backtest.trades %}
+                <tr>
+                  <td>{{ trade.entry_date }}</td>
+                  <td>{{ trade.entry_price }}</td>
+                  <td>{{ trade.exit_date }}</td>
+                  <td>{{ trade.exit_price }}</td>
+                  <td>{{ trade.exit_reason }}</td>
+                  <td>{{ trade.return_percent }}%</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% else %}
+          <div class="empty compact">이 반복의 체결된 매수·매도 이력이 없습니다.</div>
+          {% endif %}
+
+          <h4>피드백 / 재분석 정보</h4>
+          <ul class="feedback-list">
+            {% for reason in feedback.reasons or validation.failure_reasons or [] %}<li>{{ reason }}</li>{% else %}<li>추가 실패 피드백 없음</li>{% endfor %}
+          </ul>
+          {% if feedback.recommended_action or validation.next_step %}<p class="compact-meta">권장 조치: {{ feedback.recommended_action or validation.next_step }}</p>{% endif %}
+          {% if feedback.diagnostics or validation.reanalysis_request %}
+          <details class="json-details"><summary>재분석 진단 JSON</summary><pre>{{ (feedback.diagnostics or validation.reanalysis_request)|tojson(indent=2) }}</pre></details>
+          {% endif %}
+          <details class="json-details"><summary>반복 전체 JSON</summary><pre>{{ iteration|tojson(indent=2) }}</pre></details>
+        </article>
+        {% endfor %}
+
+        {% if loop_detail.final_strategy_spec %}
+        <section class="loop-summary-card">
+          <h3>최종 선택 StrategySpec</h3>
+          <pre>{{ loop_detail.final_strategy_spec|tojson(indent=2) }}</pre>
+        </section>
+        {% endif %}
+      </section>
+      {% endif %}
+    </main>
+  </body>
+</html>

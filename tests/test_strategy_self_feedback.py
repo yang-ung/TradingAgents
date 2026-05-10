@@ -166,3 +166,86 @@ def test_dashboard_api_lists_and_loads_strategy_self_feedback_loops(tmp_path):
     assert detail_response.status_code == 200
     assert detail_response.json()["best_iteration"] == 2
     assert detail_response.json()["live_capital_allowed"] is False
+
+
+@pytest.mark.unit
+def test_dashboard_self_feedback_page_renders_iterations_trades_and_feedback(tmp_path):
+    from tradingagents.dashboard.app import create_dashboard_app
+    from tradingagents.dashboard.storage import AnalysisRepository
+
+    repository = AnalysisRepository(tmp_path)
+    repository.save_strategy_self_feedback_loop({
+        "loop_id": "loop-ui-1",
+        "loop_type": "strategy_self_feedback",
+        "ticker": "005930.KS",
+        "trade_date": "2026-01-01",
+        "generated_at": "2026-01-02T00:00:00+00:00",
+        "requested_iterations": 10,
+        "completed_iterations": 2,
+        "best_iteration": 2,
+        "live_capital_allowed": False,
+        "iterations": [
+            {
+                "iteration": 1,
+                "status": "completed",
+                "strategy_spec": {
+                    "strategy_id": "seed-too-narrow",
+                    "entry": {"type": "price_zone", "low": 80, "high": 81},
+                    "take_profit": {"type": "fixed_price", "price": 90},
+                    "stop_loss": {"type": "fixed_price", "price": 70},
+                    "basis": ["초기 전략 근거"],
+                },
+                "backtest": {
+                    "available": True,
+                    "strategy_return_percent": -1.5,
+                    "trade_count": 1,
+                    "trades": [
+                        {
+                            "entry_date": "2026-01-02",
+                            "entry_price": 81,
+                            "exit_date": "2026-01-03",
+                            "exit_price": 70,
+                            "exit_reason": "stop_loss",
+                            "return_percent": -13.58,
+                        }
+                    ],
+                },
+                "pre_live_validation": {
+                    "status_label": "재분석 필요",
+                    "failure_reasons": ["표본 부족"],
+                    "metrics": {"trade_count": 1, "profit_factor": 0, "max_drawdown_percent": 13.58},
+                },
+                "feedback": {"reasons": ["진입 조건이 너무 좁아 시장에서 거의 실행되지 않음"]},
+            },
+            {
+                "iteration": 2,
+                "status": "completed",
+                "strategy_spec": {
+                    "strategy_id": "revised-2",
+                    "entry": {"type": "price_zone", "low": 99, "high": 101},
+                    "take_profit": {"type": "fixed_price", "price": 105},
+                    "stop_loss": {"type": "fixed_price", "price": 95},
+                    "basis": ["피드백 기반 진입 조건 완화"],
+                },
+                "backtest": {"available": True, "strategy_return_percent": 4.0, "trade_count": 2, "trades": []},
+                "pre_live_validation": {"status_label": "paper trading 후보", "failure_reasons": [], "metrics": {"trade_count": 2}},
+                "feedback": {"reasons": []},
+            },
+        ],
+    })
+    client = TestClient(create_dashboard_app(tmp_path))
+
+    list_page = client.get("/strategy-self-feedback")
+    detail_page = client.get("/strategy-self-feedback/loop-ui-1")
+
+    assert list_page.status_code == 200
+    assert "10회 셀프 피드백 루프" in list_page.text
+    assert "loop-ui-1" in list_page.text
+    assert detail_page.status_code == 200
+    assert "반복별 전략·매매·피드백" in detail_page.text
+    assert "seed-too-narrow" in detail_page.text
+    assert "revised-2" in detail_page.text
+    assert "2026-01-02" in detail_page.text
+    assert "stop_loss" in detail_page.text
+    assert "진입 조건이 너무 좁아" in detail_page.text
+    assert "live_capital_allowed=False" in detail_page.text

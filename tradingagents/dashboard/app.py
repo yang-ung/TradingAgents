@@ -1581,6 +1581,21 @@ def create_dashboard_app(
         },
     }
 
+    self_feedback_profile = {
+        "key": "self-feedback",
+        "title": "10회 셀프 피드백",
+        "short_label": "피드백",
+        "eyebrow": "Strategy Self-Feedback",
+        "description": "반복별 전략 수정, 백테스트 매수·매도 이력, 검증 피드백을 추적합니다.",
+        "href": "/strategy-self-feedback",
+        "icon": "↻",
+        "meta": "전략 루프",
+        "accent": "violet",
+    }
+
+    def _dashboard_nav() -> list[dict[str, Any]]:
+        return [*dashboard_profiles.values(), self_feedback_profile]
+
     def _normalize_dashboard(dashboard: Optional[str]) -> str:
         key = (dashboard or "summary").strip().lower()
         return key if key in dashboard_profiles else "summary"
@@ -1674,8 +1689,51 @@ def create_dashboard_app(
                 "crypto_signal_snapshot": crypto_signal_snapshot,
                 "hourly_report": hourly_report,
                 "cross_market_context": cross_market_context,
-                "dashboard_nav": list(dashboard_profiles.values()),
+                "dashboard_nav": _dashboard_nav(),
                 "active_dashboard": active_dashboard,
+            },
+        )
+
+    @app.get("/strategy-self-feedback", response_class=HTMLResponse)
+    def strategy_self_feedback_index(
+        request: Request,
+        ticker: Optional[str] = None,
+        limit: int = Query(20, ge=1, le=100),
+    ):
+        loops = repository.list_strategy_self_feedback_loops(ticker=ticker, limit=limit)
+        for loop in loops:
+            loop["live_capital_allowed"] = False
+        return templates.TemplateResponse(
+            request,
+            "self_feedback.html",
+            {
+                "mode": "list",
+                "loops": loops,
+                "loop_detail": None,
+                "ticker": ticker or "",
+                "limit": limit,
+                "dashboard_nav": _dashboard_nav(),
+                "active_dashboard": self_feedback_profile,
+            },
+        )
+
+    @app.get("/strategy-self-feedback/{loop_id}", response_class=HTMLResponse)
+    def strategy_self_feedback_detail(request: Request, loop_id: str):
+        loop = repository.get_strategy_self_feedback_loop(loop_id)
+        if loop is None:
+            raise HTTPException(status_code=404, detail=f"Unknown strategy self-feedback loop: {loop_id}")
+        loop["live_capital_allowed"] = False
+        return templates.TemplateResponse(
+            request,
+            "self_feedback.html",
+            {
+                "mode": "detail",
+                "loops": repository.list_strategy_self_feedback_loops(ticker=loop.get("ticker"), limit=20),
+                "loop_detail": loop,
+                "ticker": loop.get("ticker") or "",
+                "limit": 20,
+                "dashboard_nav": _dashboard_nav(),
+                "active_dashboard": self_feedback_profile,
             },
         )
 
@@ -1884,7 +1942,7 @@ def create_dashboard_app(
             "cross_market_context.html",
             {
                 "context": context,
-                "dashboard_nav": list(dashboard_profiles.values()),
+                "dashboard_nav": _dashboard_nav(),
                 "active_dashboard": dashboard_profiles.get("summary"),
             },
         )
