@@ -65,7 +65,19 @@ def run_strategy_self_feedback_loop(
             requested_iterations,
             loop_id,
         )
-        agent_output = agent_runner(payload)
+        try:
+            agent_output = agent_runner(payload)
+        except Exception as exc:
+            loop_iterations.append({
+                "iteration": iteration_number + 1,
+                "status": "agent_error",
+                "agent_called": True,
+                "feedback": payload["feedback"],
+                "error_type": type(exc).__name__,
+                "error": str(exc),
+                "live_capital_allowed": False,
+            })
+            break
         next_record = _record_from_agent_output(current_record, agent_output, iteration_number + 1)
         if next_record is None:
             loop_iterations.append({
@@ -129,6 +141,9 @@ def run_quant_strategy_self_feedback_agent(payload: dict[str, Any]) -> dict[str,
     bridge_payload["openai_use_hermes_codex_auth"] = bool(
         payload.get("openai_use_hermes_codex_auth") or metadata.get("openai_use_hermes_codex_auth")
     )
+    bridge_payload["selected_analysts"] = payload.get("selected_analysts") or ["quant"]
+    bridge_payload["llm_timeout"] = payload.get("llm_timeout") or metadata.get("llm_timeout")
+    bridge_payload["llm_max_retries"] = payload.get("llm_max_retries") or metadata.get("llm_max_retries")
     return run_quant_strategy_reanalysis_agent(bridge_payload)
 
 

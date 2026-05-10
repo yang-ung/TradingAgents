@@ -88,6 +88,29 @@ def test_self_feedback_loop_repeats_agent_revision_and_selects_best_iteration():
 
 
 @pytest.mark.unit
+def test_self_feedback_loop_records_agent_error_without_losing_previous_iteration():
+    from tradingagents.validation.self_feedback import run_strategy_self_feedback_loop
+
+    def failing_agent_runner(payload):
+        raise TimeoutError("llm request timed out")
+
+    result = run_strategy_self_feedback_loop(
+        _BASE_RECORD,
+        _CHART,
+        iterations=3,
+        agent_runner=failing_agent_runner,
+    )
+
+    assert result["requested_iterations"] == 3
+    assert result["completed_iterations"] == 1
+    assert len(result["iterations"]) == 2
+    assert result["iterations"][0]["status"] == "completed"
+    assert result["iterations"][1]["status"] == "agent_error"
+    assert result["iterations"][1]["error_type"] == "TimeoutError"
+    assert result["live_capital_allowed"] is False
+
+
+@pytest.mark.unit
 def test_repository_persists_self_feedback_loop_result(tmp_path):
     from tradingagents.dashboard.storage import AnalysisRepository
 

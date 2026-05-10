@@ -28,6 +28,8 @@ DEFAULT_CONFIG = {
     "openai_api_key_provider": None,    # zero-arg callable returning a fresh token
     "openai_api_key_command": None,     # shell command that prints a fresh token
     "openai_use_hermes_codex_auth": False,  # reuse Hermes-managed Codex OAuth token + base_url
+    "llm_timeout": int(os.getenv("TRADINGAGENTS_LLM_TIMEOUT_SECONDS", "180")),
+    "llm_max_retries": int(os.getenv("TRADINGAGENTS_LLM_MAX_RETRIES", "1")),
     "anthropic_effort": None,           # "high", "medium", "low"
     # Checkpoint/resume: when True, LangGraph saves state after each node
     # so a crashed run can resume from the last successful step.

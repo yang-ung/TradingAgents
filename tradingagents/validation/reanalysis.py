@@ -116,7 +116,12 @@ def run_quant_strategy_reanalysis_agent(payload: dict[str, Any]) -> dict[str, An
     artifact_dir = payload.get("artifact_dir") or DEFAULT_ARTIFACT_DIR
     use_hermes_codex_auth = bool(payload.get("openai_use_hermes_codex_auth"))
     config = build_batch_config(artifact_dir, use_hermes_codex_auth=use_hermes_codex_auth)
-    graph = TradingAgentsGraph(debug=False, config=config)
+    if payload.get("llm_timeout") is not None:
+        config["llm_timeout"] = payload.get("llm_timeout")
+    if payload.get("llm_max_retries") is not None:
+        config["llm_max_retries"] = payload.get("llm_max_retries")
+    selected_analysts = payload.get("selected_analysts") or ["quant"]
+    graph = TradingAgentsGraph(selected_analysts=selected_analysts, debug=False, config=config)
     final_state, _ = graph.propagate_reanalysis(
         payload.get("ticker") or (payload.get("record") or {}).get("ticker"),
         payload.get("trade_date") or (payload.get("record") or {}).get("trade_date"),

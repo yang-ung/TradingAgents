@@ -116,3 +116,59 @@ def test_reanalysis_orchestrator_does_not_call_agent_without_reanalysis_request(
     assert result["triggered"] is False
     assert result["status"] == "not_required"
     assert called is False
+
+@pytest.mark.unit
+def test_reanalysis_agent_uses_quant_only_graph_and_forwards_llm_limits(monkeypatch, tmp_path):
+    from tradingagents.validation import reanalysis as reanalysis_module
+
+    captured = {}
+
+    class FakeGraph:
+        def __init__(self, *, selected_analysts, debug, config):
+            captured["selected_analysts"] = selected_analysts
+            captured["debug"] = debug
+            captured["config"] = config
+
+        def propagate_reanalysis(self, ticker, trade_date, *, reanalysis_payload):
+            captured["ticker"] = ticker
+            captured["trade_date"] = trade_date
+            captured["reanalysis_payload"] = reanalysis_payload
+            return {
+                "company_of_interest": ticker,
+                "trade_date": trade_date,
+                "final_trade_decision": "Hold",
+                "quant_strategy_report": "StrategySpec 없음",
+            }, None
+
+    def fake_build_analysis_record(final_state, **kwargs):
+        return {
+            "run_id": "reanalysis-run",
+            "ticker": captured["ticker"],
+            "trade_date": captured["trade_date"],
+            "reports": {"quant_strategy_report": "전략 재분석"},
+            "strategy_spec": {
+                "strategy_id": "spec",
+                "ticker": captured["ticker"],
+                "trade_date": captured["trade_date"],
+                "entry": {"type": "price_zone", "low": 99.0, "high": 101.0},
+                "take_profit": {"type": "fixed_price", "price": 110.0},
+                "stop_loss": {"type": "fixed_price", "price": 95.0},
+                "currency": "KRW",
+            },
+        }
+
+    monkeypatch.setattr("tradingagents.graph.trading_graph.TradingAgentsGraph", FakeGraph)
+    monkeypatch.setattr("tradingagents.dashboard.extract.build_analysis_record", fake_build_analysis_record)
+
+    result = reanalysis_module.run_quant_strategy_reanalysis_agent({
+        "ticker": "005930.KS",
+        "trade_date": "2026-01-01",
+        "artifact_dir": tmp_path,
+        "llm_timeout": 12,
+        "llm_max_retries": 0,
+    })
+
+    assert captured["selected_analysts"] == ["quant"]
+    assert captured["config"]["llm_timeout"] == 12
+    assert captured["config"]["llm_max_retries"] == 0
+    assert result["strategy_spec"]["strategy_id"] == "spec"
